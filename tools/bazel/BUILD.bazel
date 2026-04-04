@@ -20,7 +20,7 @@ platform(
         "@pigweed//pw_assert:assert_backend_impl": "@pigweed//pw_assert_basic:impl",
         "@pigweed//pw_assert:check_backend": "@pigweed//pw_assert_basic",
         "@pigweed//pw_assert:check_backend_impl": "@pigweed//pw_assert_basic:impl",
-        "@pigweed//pw_log:backend": "//extracted/master/evkmimxrt595_ezhb:pw_log_backend_headers",
-        "@pigweed//pw_log:backend_impl": "//extracted/master/evkmimxrt595_ezhb:pigweed_log_backend",
+        "@pigweed//pw_log:backend": "//src/master:pw_log_backend_headers",
+        "@pigweed//pw_log:backend_impl": "//src/master:pigweed_log_backend",
     }),
 )

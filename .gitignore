@@ -2,12 +2,9 @@
 .vscode/
 .venv/
 .venv-pyocd/
-toolchains/
-linkserver/
-third_party/pigweed/
-third_party/antmicro-pigweed/
-extracted/master/evkmimxrt595_ezhb/bazel-*
+.local/
 bazel-*
+.bazel-*
 bazel-bin/
 bazel-out/
 bazel-testlogs/

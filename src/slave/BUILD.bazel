@@ -17,15 +17,15 @@ cc_library(
     includes = ["."],
     copts = RT595_SLAVE_COPTS,
     defines = RT595_COMMON_DEFINES + ["APP_ENABLE_SEMIHOST=0"],
-    deps = ["//extracted/master/evkmimxrt595_ezhb:rt595_sdk_core"],
+    deps = ["//src/master:rt595_sdk_core"],
     alwayslink = 1,
 )
 
 cc_binary(
     name = "slave_ram_bin",
     deps = [":slave_variant"],
-    additional_linker_inputs = ["//extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_HelloRam.ld"],
-    linkopts = RT595_LINKOPTS + ["-T$(location //extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_HelloRam.ld)"],
+    additional_linker_inputs = ["//src/master:evkmimxrt595_ezhb_HelloRam.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location //src/master:evkmimxrt595_ezhb_HelloRam.ld)"],
 )
 
 mimxrt595_binary(
@@ -36,8 +36,8 @@ mimxrt595_binary(
 cc_binary(
     name = "slave_flash_bin",
     deps = [":slave_variant"],
-    additional_linker_inputs = ["//extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_Debug.ld"],
-    linkopts = RT595_LINKOPTS + ["-T$(location //extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_Debug.ld)"],
+    additional_linker_inputs = ["//src/master:evkmimxrt595_ezhb_Debug.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location //src/master:evkmimxrt595_ezhb_Debug.ld)"],
 )
 
 mimxrt595_binary(

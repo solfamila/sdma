@@ -1,4 +1,5 @@
 common --verbose_failures
 build --strip=never
+build --symlink_prefix=.bazel-
 
 try-import %workspace%/user.bazelrc

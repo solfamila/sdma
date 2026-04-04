@@ -2,7 +2,8 @@ diff --git a/MODULE.bazel b/MODULE.bazel
 index 85865c5..ee19a30 100644
 --- a/MODULE.bazel
 +++ b/MODULE.bazel
-@@ -17,7 +17,12 @@ module(
+@@ -15,8 +15,13 @@ module(
+     name = "pigweed",
      version = "0.0.1",
  )
  
@@ -16,14 +17,12 @@ index 85865c5..ee19a30 100644
  
  bazel_dep(name = "bazel_skylib", version = "1.7.1")
  # Ideally we should use boringssl from bazel registry
-@@ -153,11 +158,10 @@ cipd_repository(
- )
- 
+@@ -155,9 +160,8 @@ cipd_repository(
  # Fetch gcc-arm-none-eabi toolchain.
 -cipd_repository(
 +new_local_repository(
      name = "gcc_arm_none_eabi_toolchain",
-+    path = "/Users/foxy/Downloads/tts/toolchains/arm-gnu-toolchain-15.2.rel1-darwin-arm64-arm-none-eabi",
++    path = "/Users/foxy/Downloads/tts/.local/toolchains/arm-gnu-toolchain-15.2.rel1-darwin-arm64-arm-none-eabi",
      build_file = "//pw_toolchain/build_external:arm_none_eabi_gcc.BUILD",
 -    path = "fuchsia/third_party/armgcc/${os}-${arch}",
 -    tag = "version:2@13.3.rel1.1",

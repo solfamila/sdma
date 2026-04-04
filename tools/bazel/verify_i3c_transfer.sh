@@ -12,7 +12,7 @@ else
   SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
   WORKSPACE_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 fi
-LINKSERVER=${LINKSERVER_BIN:-$WORKSPACE_DIR/linkserver/extracted/flatten_LinkServer_25.12.83.pkg/Payload/LinkServer}
+LINKSERVER=${LINKSERVER_BIN:-$WORKSPACE_DIR/.local/linkserver/extracted/flatten_LinkServer_25.12.83.pkg/Payload/LinkServer}
 DEVICE=${RT595_DEVICE:-MIMXRT595S:EVK-MIMXRT595}
 MASTER_PROBE=${RT595_MASTER_PROBE:-${RT595_PROBE:-$DEFAULT_MASTER_PROBE}}
 SLAVE_PROBE=${RT595_SLAVE_PROBE:-$DEFAULT_SLAVE_PROBE}
