@@ -1,0 +1,22 @@
+.DS_Store
+.vscode/
+.venv/
+.venv-pyocd/
+toolchains/
+linkserver/
+*.zip
+
+# Generated outputs
+**/build_manual/
+**/Debug/
+**/*.map
+**/*.elf
+**/*.axf
+**/*.bin
+**/*.hex
+**/*.o
+**/*.d
+
+# Temporary logs
+*.log
+nohup.out
