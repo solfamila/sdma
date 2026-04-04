@@ -15,8 +15,14 @@ case "$VARIANT" in
   hello-ram)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_ram.elf"
     ;;
+  pigweed-ram)
+    ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_pigweed_ram.elf"
+    ;;
   master-ram)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_ram.elf"
+    ;;
+  master-pigweed-ram)
+    ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_pigweed_ram.elf"
     ;;
   slave-ram)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_slave_ram.elf"
@@ -24,14 +30,20 @@ case "$VARIANT" in
   hello-flash)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb.elf"
     ;;
+  pigweed-flash)
+    ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_pigweed.elf"
+    ;;
   master-flash)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master.elf"
+    ;;
+  master-pigweed-flash)
+    ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_pigweed.elf"
     ;;
   slave-flash)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_slave.elf"
     ;;
   *)
-    echo "usage: $0 [hello-ram|master-ram|slave-ram|hello-flash|master-flash|slave-flash] [semihost|serial-dtay|serial-gra]" >&2
+    echo "usage: $0 [hello-ram|pigweed-ram|master-ram|master-pigweed-ram|slave-ram|hello-flash|pigweed-flash|master-flash|master-pigweed-flash|slave-flash] [semihost|serial-dtay|serial-gra]" >&2
     exit 2
     ;;
 esac
@@ -47,7 +59,7 @@ case "$MODE" in
     exec "$LINKSERVER" run -p "$PROBE" --mode serial:/dev/cu.usbmodemGRA1CQLQ2:115200 --exit-timeout 6 "$DEVICE" "$ELF"
     ;;
   *)
-    echo "usage: $0 [hello-ram|master-ram|slave-ram|hello-flash|master-flash|slave-flash] [semihost|serial-dtay|serial-gra]" >&2
+    echo "usage: $0 [hello-ram|pigweed-ram|master-ram|master-pigweed-ram|slave-ram|hello-flash|pigweed-flash|master-flash|master-pigweed-flash|slave-flash] [semihost|serial-dtay|serial-gra]" >&2
     exit 2
     ;;
 esac

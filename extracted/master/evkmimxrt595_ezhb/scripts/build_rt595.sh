@@ -5,6 +5,7 @@ ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 WORKSPACE_DIR=$(cd "$ROOT_DIR/../../.." && pwd)
 TOOLROOT=${ARM_GNU_TOOLCHAIN:-$WORKSPACE_DIR/toolchains/arm-gnu-toolchain-15.2.rel1-darwin-arm64-arm-none-eabi}
 SLAVE_APP_DIR=${RT595_SLAVE_APP_DIR:-$WORKSPACE_DIR/extracted/smartDMA_I3C/slave/slave}
+PIGWEED_DIR=${PIGWEED_DIR:-$WORKSPACE_DIR/third_party/pigweed}
 COMPILER="$TOOLROOT/bin/arm-none-eabi-gcc"
 SIZE_TOOL="$TOOLROOT/bin/arm-none-eabi-size"
 
@@ -14,6 +15,8 @@ VERSION_HEADER="source/mcuxsdk_version.h"
 SOURCE_ROOTS=(source startup flash_config device board drivers utilities component)
 EXTRA_INCLUDE_DIRS=()
 EXTRA_DEFINES=()
+USE_PIGWEED=0
+VARIANT_SOURCE=""
 
 case "$VARIANT" in
   hello-flash)
@@ -26,10 +29,67 @@ case "$VARIANT" in
     MAP_FILE="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_ram.map"
     LINKER_SCRIPT="$ROOT_DIR/evkmimxrt595_ezhb_HelloRam.ld"
     ;;
+  pigweed-flash)
+    OUTPUT_ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_pigweed.elf"
+    MAP_FILE="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_pigweed.map"
+    LINKER_SCRIPT="$ROOT_DIR/evkmimxrt595_ezhb_Debug.ld"
+    USE_PIGWEED=1
+    VARIANT_SOURCE="variants/ezh_test_pigweed.c"
+    EXTRA_INCLUDE_DIRS=(
+      "$ROOT_DIR/pigweed_overrides"
+      "$PIGWEED_DIR/pw_log/public"
+      "$PIGWEED_DIR/pw_preprocessor/public"
+      "$PIGWEED_DIR/pw_polyfill/public"
+    )
+    EXTRA_DEFINES=(-DPW_LOG_LEVEL_DEFAULT=PW_LOG_LEVEL_INFO)
+    ;;
+  pigweed-ram)
+    OUTPUT_ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_pigweed_ram.elf"
+    MAP_FILE="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_pigweed_ram.map"
+    LINKER_SCRIPT="$ROOT_DIR/evkmimxrt595_ezhb_HelloRam.ld"
+    USE_PIGWEED=1
+    VARIANT_SOURCE="variants/ezh_test_pigweed.c"
+    EXTRA_INCLUDE_DIRS=(
+      "$ROOT_DIR/pigweed_overrides"
+      "$PIGWEED_DIR/pw_log/public"
+      "$PIGWEED_DIR/pw_preprocessor/public"
+      "$PIGWEED_DIR/pw_polyfill/public"
+    )
+    EXTRA_DEFINES=(-DPW_LOG_LEVEL_DEFAULT=PW_LOG_LEVEL_INFO)
+    ;;
   master-ram)
     OUTPUT_ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_ram.elf"
     MAP_FILE="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_ram.map"
     LINKER_SCRIPT="$ROOT_DIR/evkmimxrt595_ezhb_HelloRam.ld"
+    VARIANT_SOURCE="variants/ezh_test_master.c"
+    ;;
+  master-pigweed-flash)
+    OUTPUT_ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_pigweed.elf"
+    MAP_FILE="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_pigweed.map"
+    LINKER_SCRIPT="$ROOT_DIR/evkmimxrt595_ezhb_Debug.ld"
+    USE_PIGWEED=1
+    VARIANT_SOURCE="variants/ezh_test_master_pigweed.c"
+    EXTRA_INCLUDE_DIRS=(
+      "$ROOT_DIR/pigweed_overrides"
+      "$PIGWEED_DIR/pw_log/public"
+      "$PIGWEED_DIR/pw_preprocessor/public"
+      "$PIGWEED_DIR/pw_polyfill/public"
+    )
+    EXTRA_DEFINES=(-DPW_LOG_LEVEL_DEFAULT=PW_LOG_LEVEL_INFO)
+    ;;
+  master-pigweed-ram)
+    OUTPUT_ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_pigweed_ram.elf"
+    MAP_FILE="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_pigweed_ram.map"
+    LINKER_SCRIPT="$ROOT_DIR/evkmimxrt595_ezhb_HelloRam.ld"
+    USE_PIGWEED=1
+    VARIANT_SOURCE="variants/ezh_test_master_pigweed.c"
+    EXTRA_INCLUDE_DIRS=(
+      "$ROOT_DIR/pigweed_overrides"
+      "$PIGWEED_DIR/pw_log/public"
+      "$PIGWEED_DIR/pw_preprocessor/public"
+      "$PIGWEED_DIR/pw_polyfill/public"
+    )
+    EXTRA_DEFINES=(-DPW_LOG_LEVEL_DEFAULT=PW_LOG_LEVEL_INFO)
     ;;
   slave-flash)
     OUTPUT_ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_slave.elf"
@@ -55,12 +115,17 @@ case "$VARIANT" in
     OUTPUT_ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master.elf"
     MAP_FILE="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master.map"
     LINKER_SCRIPT="$ROOT_DIR/evkmimxrt595_ezhb_Debug.ld"
+    VARIANT_SOURCE="variants/ezh_test_master.c"
     ;;
   *)
-    echo "usage: $0 [hello-flash|hello-ram|master-flash|master-ram|slave-flash|slave-ram]" >&2
+    echo "usage: $0 [hello-flash|hello-ram|pigweed-flash|pigweed-ram|master-flash|master-ram|master-pigweed-flash|master-pigweed-ram|slave-flash|slave-ram]" >&2
     exit 2
     ;;
 esac
+
+if [[ "$USE_PIGWEED" -eq 1 ]]; then
+  "$ROOT_DIR/scripts/bootstrap_pigweed.sh"
+fi
 
 mkdir -p "$ROOT_DIR/build_manual"
 
@@ -70,14 +135,24 @@ while IFS= read -r src; do
   SOURCES+=("$src")
 done < <(find "${SOURCE_ROOTS[@]}" -type f \( -name '*.c' -o -name '*.S' \) | sort)
 
-if [[ "$VARIANT" == "master-flash" || "$VARIANT" == "master-ram" ]]; then
+if [[ "$USE_PIGWEED" -ne 1 ]]; then
+  FILTERED=()
+  for src in "${SOURCES[@]}"; do
+    if [[ "$src" != "source/pigweed_log_backend.c" && "$src" != "source/syscalls.c" ]]; then
+      FILTERED+=("$src")
+    fi
+  done
+  SOURCES=("${FILTERED[@]}")
+fi
+
+if [[ -n "$VARIANT_SOURCE" ]]; then
   FILTERED=()
   for src in "${SOURCES[@]}"; do
     if [[ "$src" != "source/ezh_test.c" ]]; then
       FILTERED+=("$src")
     fi
   done
-  SOURCES=("${FILTERED[@]}" "variants/ezh_test_master.c")
+  SOURCES=("${FILTERED[@]}" "$VARIANT_SOURCE")
 fi
 
 if [[ "$VARIANT" == "slave-flash" || "$VARIANT" == "slave-ram" ]]; then

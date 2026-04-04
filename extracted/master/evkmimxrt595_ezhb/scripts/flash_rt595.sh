@@ -14,14 +14,20 @@ case "$VARIANT" in
   hello-flash)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb.elf"
     ;;
+  pigweed-flash)
+    ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_pigweed.elf"
+    ;;
   master-flash)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master.elf"
+    ;;
+  master-pigweed-flash)
+    ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_master_pigweed.elf"
     ;;
   slave-flash)
     ELF="$ROOT_DIR/build_manual/evkmimxrt595_ezhb_slave.elf"
     ;;
   *)
-    echo "flash_rt595.sh supports only hello-flash, master-flash, or slave-flash" >&2
+    echo "flash_rt595.sh supports only hello-flash, pigweed-flash, master-flash, master-pigweed-flash, or slave-flash" >&2
     exit 2
     ;;
 esac

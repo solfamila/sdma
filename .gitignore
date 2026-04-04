@@ -4,6 +4,7 @@
 .venv-pyocd/
 toolchains/
 linkserver/
+third_party/pigweed/
 *.zip
 *.7z
 
