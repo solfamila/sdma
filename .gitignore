@@ -5,6 +5,7 @@
 toolchains/
 linkserver/
 third_party/pigweed/
+extracted/master/evkmimxrt595_ezhb/bazel-*
 *.zip
 *.7z
 

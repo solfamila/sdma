@@ -1,0 +1,13 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "build_master_pigweed_ram",
+    srcs = ["tools/bazel/build_master_pigweed_ram.sh"],
+)
+
+sh_binary(
+    name = "build_master_pigweed_flash",
+    srcs = ["tools/bazel/build_master_pigweed_flash.sh"],
+)

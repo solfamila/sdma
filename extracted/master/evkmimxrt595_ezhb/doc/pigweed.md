@@ -35,6 +35,19 @@ Pigweed backend uses semihosting instead of FLEXCOMM12.
 ./scripts/build_rt595.sh master-pigweed-flash
 ```
 
+Antmicro's sample repo uses Bazel as the top-level build entrypoint. This
+project now provides Bazel wrapper targets in the same style for the Pigweed
+master variants:
+
+```sh
+cd extracted/master/evkmimxrt595_ezhb
+bazelisk run //:build_master_pigweed_ram
+bazelisk run //:build_master_pigweed_flash
+```
+
+These Bazel targets currently wrap the existing manual GCC build scripts rather
+than replacing them with a full mcuxpresso/Pigweed Bazel target port.
+
 ## Run
 
 ```sh
