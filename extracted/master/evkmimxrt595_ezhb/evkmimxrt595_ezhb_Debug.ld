@@ -22,7 +22,7 @@ __heap_size__ = 0x4000;
 
 SECTIONS
 {
-  .interrupts :
+  .interrupts 0x08001000 :
   {
     FILL(0xff)
     __vectors_start__ = ABSOLUTE(.);
@@ -38,13 +38,11 @@ SECTIONS
     . = ALIGN(4);
   } > FLASH
 
-  .text :
+  .text 0x08001200 :
   {
     . = ALIGN(4);
     *(.after_vectors*)
     *(.text*)
-    *(CodeQuickAccess)
-    *(CodeQuickAccess*)
     *(.rodata*)
     *(.glue_7)
     *(.glue_7t)
@@ -119,12 +117,12 @@ SECTIONS
     LONG(LOADADDR(.noncacheable_init));
     LONG(ADDR(.noncacheable_init));
     LONG(SIZEOF(.noncacheable_init));
-    LONG(LOADADDR(.smartdma));
-    LONG(ADDR(.smartdma));
-    LONG(SIZEOF(.smartdma));
     LONG(LOADADDR(.quickaccess_data));
     LONG(ADDR(.quickaccess_data));
     LONG(SIZEOF(.quickaccess_data));
+    LONG(LOADADDR(.smartdma));
+    LONG(ADDR(.smartdma));
+    LONG(SIZEOF(.smartdma));
     __data_section_table_end = .;
 
     __bss_section_table = .;
@@ -186,9 +184,11 @@ SECTIONS
     __noncacheable_end__ = .;
   } > SRAM
 
-  .quickaccess_data (NOLOAD) :
+  .quickaccess_data : AT(LOADADDR(.noncacheable_init) + SIZEOF(.noncacheable_init))
   {
     . = ALIGN(4);
+    *(CodeQuickAccess)
+    *(CodeQuickAccess*)
     *(DataQuickAccess)
     *(DataQuickAccess*)
     . = ALIGN(4);
@@ -201,7 +201,7 @@ SECTIONS
     . = ALIGN(4);
   } > USB_RAM
 
-  .smartdma : AT(LOADADDR(.noncacheable_init) + SIZEOF(.noncacheable_init))
+  .smartdma : AT(LOADADDR(.quickaccess_data) + SIZEOF(.quickaccess_data))
   {
     . = ALIGN(4);
     __smartdma_start__ = .;
