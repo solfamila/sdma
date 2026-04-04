@@ -36,17 +36,33 @@ Pigweed backend uses semihosting instead of FLEXCOMM12.
 ```
 
 Antmicro's sample repo uses Bazel as the top-level build entrypoint. This
-project now provides Bazel wrapper targets in the same style for the Pigweed
-master variants:
+project now provides a real Bazel cross-build from the repository root using
+Antmicro's Pigweed fork and its Cortex-M33 arm-gcc toolchain rules.
 
 ```sh
-cd extracted/master/evkmimxrt595_ezhb
-bazelisk run //:build_master_pigweed_ram
-bazelisk run //:build_master_pigweed_flash
+cd ../../..
+bazelisk build //:master_pigweed_ram.elf
+bazelisk build //:master_pigweed_flash.elf
+bazelisk build //:slave_flash.elf
 ```
 
-These Bazel targets currently wrap the existing manual GCC build scripts rather
-than replacing them with a full mcuxpresso/Pigweed Bazel target port.
+The full workflow also has Bazel run and flash entrypoints:
+
+```sh
+bazelisk run //:flash_slave_flash
+bazelisk run //:run_master_pigweed_ram
+bazelisk run //:flash_master_pigweed_flash
+bazelisk run //:verify_master_slave_transfer
+```
+
+Defaults assume the known-good probe mapping used in bring-up:
+
+- `PRASAQKQ` for the master board
+- `GRA1CQLQ` for the slave board
+
+You can override probes or LinkServer paths with environment variables such as
+`RT595_PROBE`, `RT595_MASTER_PROBE`, `RT595_SLAVE_PROBE`, `RT595_DEVICE`, and
+`LINKSERVER_BIN`.
 
 ## Run
 

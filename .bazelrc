@@ -1,5 +1,3 @@
-# Bazel entrypoints for the RT595 Pigweed variants.
-
 common --verbose_failures
 build --strip=never
 

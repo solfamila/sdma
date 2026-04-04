@@ -1,0 +1,49 @@
+diff --git a/pw_toolchain/arm_gcc/BUILD.bazel b/pw_toolchain/arm_gcc/BUILD.bazel
+--- a/pw_toolchain/arm_gcc/BUILD.bazel
++++ b/pw_toolchain/arm_gcc/BUILD.bazel
+@@ -102,20 +102,11 @@ cc_args(
+     name = "cortex_common",
+     actions = [
+         "@rules_cc//cc/toolchains/actions:compile_actions",
+     ],
+-    args = [
+-        "-specs=nano.specs",
+-        "-specs=nosys.specs",
+-    ],
++    args = [],
+ )
+ 
+ cc_args(
+     name = "cortex_common_link",
+     actions = ["@rules_cc//cc/toolchains/actions:link_actions"],
+     args = [
+-        "-Wl,--gc-sections",
+-        "-specs=nano.specs",
+-        "-specs=nosys.specs",
+-        "-lstdc++",
+-        "-lnosys",
+-        "-lc",
+-        "-lm",
+         "-Wl,--no-warn-rwx-segment",
+     ],
+ )
+diff --git a/pw_toolchain/build_external/arm_none_eabi_gcc.BUILD b/pw_toolchain/build_external/arm_none_eabi_gcc.BUILD
+--- a/pw_toolchain/build_external/arm_none_eabi_gcc.BUILD
++++ b/pw_toolchain/build_external/arm_none_eabi_gcc.BUILD
+@@ -84,13 +84,12 @@ cc_tool(
+     }),
+ )
+ 
+-# This tool is actually just g++ under the hood, we just enumerate this
+-# tool differently to specify a different set of additional files.
++# Use gcc as the linker driver so bare-metal C targets match direct gcc links.
+ cc_tool(
+     name = "arm-none-eabi-ld",
+     src = select({
+-        "@platforms//os:windows": "//:bin/arm-none-eabi-g++.exe",
+-        "//conditions:default": "//:bin/arm-none-eabi-g++",
++        "@platforms//os:windows": "//:bin/arm-none-eabi-gcc.exe",
++        "//conditions:default": "//:bin/arm-none-eabi-gcc",
+     }),
+     data = glob([
+         "**/*.a",

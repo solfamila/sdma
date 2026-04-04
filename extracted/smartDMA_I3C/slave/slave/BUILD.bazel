@@ -1,0 +1,46 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("//tools/bazel:rt595_defs.bzl", "RT595_COMMON_DEFINES", "RT595_LINKOPTS", "RT595_SLAVE_COPTS")
+load("//tools/bazel:transition.bzl", "mimxrt595_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "slave_variant",
+    srcs = [
+        "board.c",
+        "clock_config.c",
+        "hardware_init.c",
+        "i3c_interrupt_b2b_transfer_slave.c",
+        "pin_mux.c",
+    ],
+    hdrs = glob(["*.h"]),
+    includes = ["."],
+    copts = RT595_SLAVE_COPTS,
+    defines = RT595_COMMON_DEFINES + ["APP_ENABLE_SEMIHOST=0"],
+    deps = ["//extracted/master/evkmimxrt595_ezhb:rt595_sdk_core"],
+    alwayslink = 1,
+)
+
+cc_binary(
+    name = "slave_ram_bin",
+    deps = [":slave_variant"],
+    additional_linker_inputs = ["//extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_HelloRam.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location //extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_HelloRam.ld)"],
+)
+
+mimxrt595_binary(
+    name = "slave_ram.elf",
+    binary = ":slave_ram_bin",
+)
+
+cc_binary(
+    name = "slave_flash_bin",
+    deps = [":slave_variant"],
+    additional_linker_inputs = ["//extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_Debug.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location //extracted/master/evkmimxrt595_ezhb:evkmimxrt595_ezhb_Debug.ld)"],
+)
+
+mimxrt595_binary(
+    name = "slave_flash.elf",
+    binary = ":slave_flash_bin",
+)

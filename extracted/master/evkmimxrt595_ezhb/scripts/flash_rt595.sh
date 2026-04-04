@@ -34,3 +34,7 @@ esac
 
 "$LINKSERVER" flash -p "$PROBE" "$DEVICE" load -e "$ELF"
 "$LINKSERVER" flash -p "$PROBE" "$DEVICE" verify "$ELF"
+
+# LinkServer verify halts the target; launch the verified image again so a
+# flashed slave stays resident for master/slave bring-up.
+"$LINKSERVER" flash -p "$PROBE" "$DEVICE" load -e "$ELF"

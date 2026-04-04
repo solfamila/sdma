@@ -1,0 +1,80 @@
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+alias(
+    name = "master_pigweed_ram.elf",
+    actual = "//extracted/master/evkmimxrt595_ezhb:master_pigweed_ram.elf",
+)
+
+alias(
+    name = "master_pigweed_flash.elf",
+    actual = "//extracted/master/evkmimxrt595_ezhb:master_pigweed_flash.elf",
+)
+
+alias(
+    name = "slave_ram.elf",
+    actual = "//extracted/smartDMA_I3C/slave/slave:slave_ram.elf",
+)
+
+alias(
+    name = "slave_flash.elf",
+    actual = "//extracted/smartDMA_I3C/slave/slave:slave_flash.elf",
+)
+
+sh_binary(
+    name = "run_master_pigweed_ram",
+    srcs = ["//tools/bazel:run_linkserver.sh"],
+    data = ["//extracted/master/evkmimxrt595_ezhb:master_pigweed_ram.elf"],
+    args = [
+        "$(location //extracted/master/evkmimxrt595_ezhb:master_pigweed_ram.elf)",
+        "PRASAQKQ",
+        "semihost",
+    ],
+)
+
+sh_binary(
+    name = "flash_master_pigweed_flash",
+    srcs = ["//tools/bazel:flash_linkserver.sh"],
+    data = ["//extracted/master/evkmimxrt595_ezhb:master_pigweed_flash.elf"],
+    args = [
+        "$(location //extracted/master/evkmimxrt595_ezhb:master_pigweed_flash.elf)",
+        "PRASAQKQ",
+    ],
+)
+
+sh_binary(
+    name = "run_slave_ram",
+    srcs = ["//tools/bazel:run_linkserver.sh"],
+    data = ["//extracted/smartDMA_I3C/slave/slave:slave_ram.elf"],
+    args = [
+        "$(location //extracted/smartDMA_I3C/slave/slave:slave_ram.elf)",
+        "GRA1CQLQ",
+        "semihost",
+    ],
+)
+
+sh_binary(
+    name = "flash_slave_flash",
+    srcs = ["//tools/bazel:flash_linkserver.sh"],
+    data = ["//extracted/smartDMA_I3C/slave/slave:slave_flash.elf"],
+    args = [
+        "$(location //extracted/smartDMA_I3C/slave/slave:slave_flash.elf)",
+        "GRA1CQLQ",
+    ],
+)
+
+sh_binary(
+    name = "verify_master_slave_transfer",
+    srcs = ["//tools/bazel:verify_i3c_transfer.sh"],
+    data = [
+        "//extracted/master/evkmimxrt595_ezhb:master_pigweed_ram.elf",
+        "//extracted/smartDMA_I3C/slave/slave:slave_flash.elf",
+    ],
+    args = [
+        "$(location //extracted/master/evkmimxrt595_ezhb:master_pigweed_ram.elf)",
+        "$(location //extracted/smartDMA_I3C/slave/slave:slave_flash.elf)",
+        "PRASAQKQ",
+        "GRA1CQLQ",
+    ],
+)

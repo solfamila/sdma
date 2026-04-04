@@ -1,0 +1,57 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+index 85865c5..ee19a30 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -17,7 +17,12 @@ module(
+     version = "0.0.1",
+ )
+ 
+-register_execution_platforms("@local_config_platform//:host")
++new_local_repository = use_repo_rule(
++    "@bazel_tools//tools/build_defs/repo:local.bzl",
++    "new_local_repository",
++)
++
++register_execution_platforms("@platforms//host")
+ 
+ bazel_dep(name = "bazel_skylib", version = "1.7.1")
+ # Ideally we should use boringssl from bazel registry
+@@ -153,11 +158,10 @@ cipd_repository(
+ )
+ 
+ # Fetch gcc-arm-none-eabi toolchain.
+-cipd_repository(
++new_local_repository(
+     name = "gcc_arm_none_eabi_toolchain",
++    path = "/Users/foxy/Downloads/tts/toolchains/arm-gnu-toolchain-15.2.rel1-darwin-arm64-arm-none-eabi",
+     build_file = "//pw_toolchain/build_external:arm_none_eabi_gcc.BUILD",
+-    path = "fuchsia/third_party/armgcc/${os}-${arch}",
+-    tag = "version:2@13.3.rel1.1",
+ )
+ 
+ register_toolchains(
+diff --git a/pw_unit_test/BUILD.bazel b/pw_unit_test/BUILD.bazel
+index 5b44f6d..fc75482 100644
+--- a/pw_unit_test/BUILD.bazel
++++ b/pw_unit_test/BUILD.bazel
+@@ -13,7 +13,7 @@
+ # the License.
+ 
+ load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
+-load("@local_config_platform//:constraints.bzl", "HOST_CONSTRAINTS")
++load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+ load("@rules_python//python:proto.bzl", "py_proto_library")
+ load("@rules_python//sphinxdocs:sphinx_docs_library.bzl", "sphinx_docs_library")
+ load("//pw_build:compatibility.bzl", "boolean_constraint_value", "incompatible_with_mcu")
+diff --git a/targets/rp2040/py/BUILD.bazel b/targets/rp2040/py/BUILD.bazel
+index 7421a9d..a52027e 100644
+--- a/targets/rp2040/py/BUILD.bazel
++++ b/targets/rp2040/py/BUILD.bazel
+@@ -108,6 +108,6 @@ pw_py_binary(
+ 
+ platform_data(
+     name = "unit_test_client",
+-    platform = "@local_config_platform//:host",
++    platform = "@platforms//host",
+     target = ":_unit_test_client",
+ )

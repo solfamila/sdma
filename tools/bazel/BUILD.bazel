@@ -1,0 +1,26 @@
+load("@pigweed//pw_build:merge_flags.bzl", "flags_from_dict")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "flash_linkserver.sh",
+    "run_linkserver.sh",
+    "verify_i3c_transfer.sh",
+])
+
+platform(
+    name = "mimxrt595_platform",
+    constraint_values = [
+        "@platforms//cpu:armv8-m",
+        "@platforms//os:none",
+        "@pigweed//pw_build/constraints/arm:cortex-m33",
+    ],
+    flags = flags_from_dict({
+        "@pigweed//pw_assert:assert_backend": "@pigweed//pw_assert_basic",
+        "@pigweed//pw_assert:assert_backend_impl": "@pigweed//pw_assert_basic:impl",
+        "@pigweed//pw_assert:check_backend": "@pigweed//pw_assert_basic",
+        "@pigweed//pw_assert:check_backend_impl": "@pigweed//pw_assert_basic:impl",
+        "@pigweed//pw_log:backend": "//extracted/master/evkmimxrt595_ezhb:pw_log_backend_headers",
+        "@pigweed//pw_log:backend_impl": "//extracted/master/evkmimxrt595_ezhb:pigweed_log_backend",
+    }),
+)

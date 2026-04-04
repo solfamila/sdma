@@ -1,13 +1,154 @@
-load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("//tools/bazel:rt595_defs.bzl", "RT595_COMMON_COPTS", "RT595_COMMON_DEFINES", "RT595_LINKOPTS", "RT595_MASTER_COPTS", "RT595_MASTER_INCLUDES", "RT595_PIGWEED_DEFINES")
+load("//tools/bazel:transition.bzl", "mimxrt595_binary")
 
 package(default_visibility = ["//visibility:public"])
 
-sh_binary(
-    name = "build_master_pigweed_ram",
-    srcs = ["tools/bazel/build_master_pigweed_ram.sh"],
+cc_library(
+    name = "rt595_sdk_core",
+    srcs = [
+        "component/uart/fsl_adapter_usart.c",
+        "device/system_MIMXRT595S_cm33.c",
+        "drivers/fsl_cache.c",
+        "drivers/fsl_clock.c",
+        "drivers/fsl_common.c",
+        "drivers/fsl_common_arm.c",
+        "drivers/fsl_dsp.c",
+        "drivers/fsl_flexcomm.c",
+        "drivers/fsl_flexspi.c",
+        "drivers/fsl_gpio.c",
+        "drivers/fsl_i2s_bridge.c",
+        "drivers/fsl_i3c.c",
+        "drivers/fsl_iap.c",
+        "drivers/fsl_inputmux.c",
+        "drivers/fsl_power.c",
+        "drivers/fsl_reset.c",
+        "drivers/fsl_smartdma.c",
+        "drivers/fsl_usart.c",
+        "flash_config/flash_config.c",
+        "startup/startup_mimxrt595s_cm33.c",
+        "utilities/debug_console_lite/fsl_debug_console.c",
+        "utilities/fsl_assert.c",
+        "utilities/fsl_memcpy.S",
+        "utilities/str/fsl_str.c",
+    ],
+    hdrs = glob([
+        "CMSIS/**/*.h",
+        "board/**/*.h",
+        "component/**/*.h",
+        "device/**/*.h",
+        "drivers/**/*.h",
+        "flash_config/**/*.h",
+        "source/**/*.h",
+        "utilities/**/*.h",
+    ]),
+    includes = RT595_MASTER_INCLUDES,
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES,
+    alwayslink = 1,
 )
 
-sh_binary(
-    name = "build_master_pigweed_flash",
-    srcs = ["tools/bazel/build_master_pigweed_flash.sh"],
+cc_library(
+    name = "rt595_board_support",
+    srcs = [
+        "board/board.c",
+        "board/clock_config.c",
+        "board/hardware_init.c",
+        "board/pin_mux.c",
+    ],
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES,
+    includes = RT595_MASTER_INCLUDES,
+    deps = [":rt595_sdk_core"],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "rt595_master_runtime",
+    srcs = [
+        "source/ezh_features.c",
+        "source/semihost_hardfault.c",
+    ],
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES,
+    includes = RT595_MASTER_INCLUDES,
+    deps = [
+        ":rt595_board_support",
+        ":rt595_sdk_core",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "pw_log_backend_headers",
+    hdrs = ["pigweed_overrides/pw_log_backend/log_backend.h"],
+    strip_include_prefix = "pigweed_overrides",
+    deps = ["@pigweed//pw_preprocessor"],
+)
+
+cc_library(
+    name = "pigweed_log_backend",
+    srcs = [
+        "source/pigweed_log_backend.c",
+        "source/syscalls.c",
+    ],
+    copts = RT595_COMMON_COPTS,
+    defines = RT595_COMMON_DEFINES + RT595_PIGWEED_DEFINES,
+    includes = RT595_MASTER_INCLUDES,
+    deps = [
+        ":pw_log_backend_headers",
+        "@pigweed//pw_log:facade",
+        "@pigweed//pw_preprocessor",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "master_pigweed_variant",
+    srcs = ["variants/ezh_test_master_pigweed.c"],
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES + RT595_PIGWEED_DEFINES,
+    includes = RT595_MASTER_INCLUDES,
+    deps = [
+        ":pigweed_log_backend",
+        ":pw_log_backend_headers",
+        ":rt595_master_runtime",
+        "@pigweed//pw_log:facade",
+    ],
+)
+
+cc_binary(
+    name = "master_pigweed_ram_bin",
+    deps = [
+        ":master_pigweed_variant",
+        ":pigweed_log_backend",
+        ":rt595_board_support",
+        ":rt595_master_runtime",
+        ":rt595_sdk_core",
+    ],
+    additional_linker_inputs = ["evkmimxrt595_ezhb_HelloRam.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_HelloRam.ld)"],
+)
+
+mimxrt595_binary(
+    name = "master_pigweed_ram.elf",
+    binary = ":master_pigweed_ram_bin",
+)
+
+cc_binary(
+    name = "master_pigweed_flash_bin",
+    deps = [
+        ":master_pigweed_variant",
+        ":pigweed_log_backend",
+        ":rt595_board_support",
+        ":rt595_master_runtime",
+        ":rt595_sdk_core",
+    ],
+    additional_linker_inputs = ["evkmimxrt595_ezhb_Debug.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_Debug.ld)"],
+)
+
+mimxrt595_binary(
+    name = "master_pigweed_flash.elf",
+    binary = ":master_pigweed_flash_bin",
 )

@@ -5,9 +5,15 @@
 toolchains/
 linkserver/
 third_party/pigweed/
+third_party/antmicro-pigweed/
 extracted/master/evkmimxrt595_ezhb/bazel-*
+bazel-*
+bazel-bin/
+bazel-out/
+bazel-testlogs/
 *.zip
 *.7z
+
 
 # Generated outputs
 **/build_manual/

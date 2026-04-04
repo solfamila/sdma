@@ -1,0 +1,32 @@
+module(
+    name = "tts",
+    version = "0.0.1",
+)
+
+bazel_dep(name = "pigweed")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "pw_toolchain")
+bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "rules_platform", version = "0.1.0")
+bazel_dep(name = "rules_shell", version = "0.6.1")
+
+archive_override(
+    module_name = "pigweed",
+    patch_strip = 1,
+    patches = [
+        "//tools/bazel/patches:pigweed_local_config_platform.patch",
+        "//tools/bazel/patches:pigweed_rt595_toolchain.patch",
+    ],
+    strip_prefix = "pigweed-0e7c66e1d3a883f5c3bdfcaf76603d74853a3c51",
+    urls = ["https://github.com/antmicro/pigweed/archive/0e7c66e1d3a883f5c3bdfcaf76603d74853a3c51.tar.gz"],
+)
+
+archive_override(
+    module_name = "pw_toolchain",
+    strip_prefix = "pigweed-0e7c66e1d3a883f5c3bdfcaf76603d74853a3c51/pw_toolchain_bazel",
+    urls = ["https://github.com/antmicro/pigweed/archive/0e7c66e1d3a883f5c3bdfcaf76603d74853a3c51.tar.gz"],
+)
+
+register_toolchains(
+    "@pigweed//pw_toolchain/arm_gcc:arm_gcc_cc_toolchain_cortex-m33",
+)
