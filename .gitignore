@@ -5,6 +5,7 @@
 toolchains/
 linkserver/
 *.zip
+*.7z
 
 # Generated outputs
 **/build_manual/
