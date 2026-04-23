@@ -59,8 +59,10 @@ struct _i3c_master_smartdma_handle
     uint8_t state;                          /*!< Transfer state machine current state. */
     uint32_t transferCount;                 /*!< Indicates progress of the transfer */
     status_t smartdmaCompletionStatus;      /*!< Status reported by the SmartDMA completion callback. */
+    uint32_t dataIrqMask;                   /*!< FIFO-ready IRQ source temporarily handed to SmartDMA. */
     bool smartdmaCompletionPending;         /*!< Tail-byte SmartDMA completion has not run yet. */
     bool smartdmaReadTailPending;           /*!< The final read byte still needs to be drained from the FIFO. */
+    bool cpuIrqMasked;                      /*!< CM33 I3C NVIC line is masked during the SmartDMA data phase. */
     uint8_t subaddressBuffer[4];            /*!< Saving subaddress command. */
     uint8_t subaddressCount;                /*!< Saving command count. */
     i3c_master_transfer_t transfer;         /*!< Copy of the current transfer info. */

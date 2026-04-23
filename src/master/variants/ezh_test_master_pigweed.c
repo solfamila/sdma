@@ -95,6 +95,34 @@ static void log_buffer_info(const char *label, const uint8_t *buffer, uint32_t l
     }
 }
 
+static void log_read_irq_metrics(uint32_t readSdmaIrqSeen,
+                                 uint32_t readCpuIrqCount,
+                                 uint32_t readCpuIrqControlCount,
+                                 uint32_t readCpuIrqDataCount,
+                                 uint32_t readCpuIrqSuppressedCount,
+                                 uint32_t readCpuIrqSuppressedPreDisableNvicCount,
+                                 uint32_t readCpuIrqSuppressedPreDisablePendingMask,
+                                 uint32_t readCpuIrqSuppressedPreDisableStatusMask)
+{
+    log_status_info("master: read sdma irq seen=", readSdmaIrqSeen);
+    log_status_info("master: read cm33 i3c irq count=", readCpuIrqCount);
+    log_status_info("master: read cm33 i3c ctrl irq count=", readCpuIrqControlCount);
+    log_status_info("master: read cm33 i3c data irq count=", readCpuIrqDataCount);
+    log_status_info("master: read cm33 i3c suppressed irq count=", readCpuIrqSuppressedCount);
+    log_status_info("master: read cm33 i3c pre-disable nvic pending count=", readCpuIrqSuppressedPreDisableNvicCount);
+    log_status_info("master: read cm33 i3c pre-disable pending mask=", readCpuIrqSuppressedPreDisablePendingMask);
+    log_status_info("master: read cm33 i3c pre-disable status mask=", readCpuIrqSuppressedPreDisableStatusMask);
+}
+
+static void log_read_post_return_snapshot(uint32_t readPostReturnPendingMask,
+                                          uint32_t readPostReturnStatusMask,
+                                          uint32_t readPostReturnNvicPending)
+{
+    log_status_info("master: read post-return pending mask=", readPostReturnPendingMask);
+    log_status_info("master: read post-return status mask=", readPostReturnStatusMask);
+    log_status_info("master: read post-return nvic pending=", readPostReturnNvicPending);
+}
+
 static void i3c_master_ibi_callback(I3C_Type *base,
                                     i3c_master_smartdma_handle_t *handle,
                                     i3c_ibi_type_t ibiType,
@@ -217,6 +245,17 @@ int main(void)
 {
     i3c_master_config_t masterConfig;
     i3c_master_transfer_t masterXfer;
+    uint32_t readSdmaIrqSeen = 0U;
+    uint32_t readCpuIrqCount = 0U;
+    uint32_t readCpuIrqControlCount = 0U;
+    uint32_t readCpuIrqDataCount = 0U;
+    uint32_t readCpuIrqSuppressedCount = 0U;
+    uint32_t readCpuIrqSuppressedPreDisableNvicCount = 0U;
+    uint32_t readCpuIrqSuppressedPreDisablePendingMask = 0U;
+    uint32_t readCpuIrqSuppressedPreDisableStatusMask = 0U;
+    uint32_t readPostReturnPendingMask = 0U;
+    uint32_t readPostReturnStatusMask = 0U;
+    uint32_t readPostReturnNvicPending = 0U;
     uint8_t slaveAddr = 0U;
     status_t result           = kStatus_Success;
 
@@ -333,6 +372,7 @@ int main(void)
     masterXfer.dataSize     = sizeof(ezh_data_buffer);
 
     g_sdmaIrqSeen = false;
+    I3C_MasterClearIrqEntryCount(EXAMPLE_MASTER);
     result = run_transfer_blocking(&masterXfer);
     if (result != kStatus_Success)
     {
@@ -341,7 +381,6 @@ int main(void)
     }
 
     log_info_line("master: write transfer complete\n");
-    log_status_info("master: sdma irq seen=", g_sdmaIrqSeen ? 1U : 0U);
 
     for (volatile uint32_t delay = 0U; delay < WAIT_TIME; delay++)
     {
@@ -359,15 +398,37 @@ int main(void)
     masterXfer.dataSize     = sizeof(ezh_data_buffer_rx);
 
     g_sdmaIrqSeen = false;
+    I3C_MasterClearIrqEntryCount(EXAMPLE_MASTER);
     result = run_transfer_blocking(&masterXfer);
+    readSdmaIrqSeen = g_sdmaIrqSeen ? 1U : 0U;
+    readCpuIrqCount = I3C_MasterGetIrqEntryCount(EXAMPLE_MASTER);
+    readCpuIrqControlCount = I3C_MasterGetControlIrqEntryCount(EXAMPLE_MASTER);
+    readCpuIrqDataCount = I3C_MasterGetDataIrqEntryCount(EXAMPLE_MASTER);
+    readCpuIrqSuppressedCount = I3C_MasterGetSuppressedIrqCount(EXAMPLE_MASTER);
+    readCpuIrqSuppressedPreDisableNvicCount = I3C_MasterGetSuppressedNvicPendingCount(EXAMPLE_MASTER);
+    readCpuIrqSuppressedPreDisablePendingMask = I3C_MasterGetSuppressedPendingMask(EXAMPLE_MASTER);
+    readCpuIrqSuppressedPreDisableStatusMask = I3C_MasterGetSuppressedStatusMask(EXAMPLE_MASTER);
+    readPostReturnPendingMask = I3C_MasterGetPendingInterrupts(EXAMPLE_MASTER);
+    readPostReturnStatusMask = EXAMPLE_MASTER->MSTATUS;
+    readPostReturnNvicPending = NVIC_GetPendingIRQ(I3C0_IRQn) != 0U ? 1U : 0U;
     if (result != kStatus_Success)
     {
+        log_read_irq_metrics(readSdmaIrqSeen,
+                             readCpuIrqCount,
+                             readCpuIrqControlCount,
+                             readCpuIrqDataCount,
+                             readCpuIrqSuppressedCount,
+                             readCpuIrqSuppressedPreDisableNvicCount,
+                             readCpuIrqSuppressedPreDisablePendingMask,
+                             readCpuIrqSuppressedPreDisableStatusMask);
+        log_read_post_return_snapshot(readPostReturnPendingMask,
+                                      readPostReturnStatusMask,
+                                      readPostReturnNvicPending);
         log_status_error("master: read transfer failed ", (uint32_t)result);
         return -1;
     }
 
     log_info_line("master: read transfer complete\n");
-    log_status_info("master: sdma irq seen=", g_sdmaIrqSeen ? 1U : 0U);
 
     for (uint32_t index = 0U; index < sizeof(ezh_data_buffer); index++)
     {
@@ -387,6 +448,17 @@ int main(void)
     }
 
     log_info_line("master: roundtrip compare success\n");
+    log_read_irq_metrics(readSdmaIrqSeen,
+                         readCpuIrqCount,
+                         readCpuIrqControlCount,
+                         readCpuIrqDataCount,
+                         readCpuIrqSuppressedCount,
+                         readCpuIrqSuppressedPreDisableNvicCount,
+                         readCpuIrqSuppressedPreDisablePendingMask,
+                         readCpuIrqSuppressedPreDisableStatusMask);
+    log_read_post_return_snapshot(readPostReturnPendingMask,
+                                  readPostReturnStatusMask,
+                                  readPostReturnNvicPending);
 
     while (1)
     {

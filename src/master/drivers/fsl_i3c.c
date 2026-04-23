@@ -130,6 +130,14 @@ static const reset_ip_name_t kI3cResets[] = I3C_RSTS;
 
 static i3c_device_info_t devList[ARRAY_SIZE(kI3cBases)][I3C_MAX_DEVCNT]; /*!< I3C slave record list */
 static uint8_t usedDevCount[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile uint32_t s_i3cMasterIrqEntryCount[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile uint32_t s_i3cMasterControlIrqEntryCount[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile uint32_t s_i3cMasterDataIrqEntryCount[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile uint32_t s_i3cMasterSuppressedIrqCount[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile uint32_t s_i3cMasterSuppressedNvicPendingCount[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile uint32_t s_i3cMasterSuppressedPendingMask[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile uint32_t s_i3cMasterSuppressedStatusMask[ARRAY_SIZE(kI3cBases)] = {0};
+static volatile bool s_i3cMasterDataWindowActive[ARRAY_SIZE(kI3cBases)] = {false};
 
 /*! @brief Pointer to master IRQ handler for each instance. */
 i3c_master_isr_t s_i3cMasterIsr;
@@ -328,6 +336,81 @@ uint32_t I3C_GetInstance(I3C_Type *base)
     assert(instance < ARRAY_SIZE(kI3cBases));
 
     return instance;
+}
+
+uint32_t I3C_MasterGetIrqEntryCount(I3C_Type *base)
+{
+    return s_i3cMasterIrqEntryCount[I3C_GetInstance(base)];
+}
+
+uint32_t I3C_MasterGetControlIrqEntryCount(I3C_Type *base)
+{
+    return s_i3cMasterControlIrqEntryCount[I3C_GetInstance(base)];
+}
+
+uint32_t I3C_MasterGetDataIrqEntryCount(I3C_Type *base)
+{
+    return s_i3cMasterDataIrqEntryCount[I3C_GetInstance(base)];
+}
+
+uint32_t I3C_MasterGetSuppressedIrqCount(I3C_Type *base)
+{
+    return s_i3cMasterSuppressedIrqCount[I3C_GetInstance(base)];
+}
+
+uint32_t I3C_MasterGetSuppressedNvicPendingCount(I3C_Type *base)
+{
+    return s_i3cMasterSuppressedNvicPendingCount[I3C_GetInstance(base)];
+}
+
+uint32_t I3C_MasterGetSuppressedPendingMask(I3C_Type *base)
+{
+    return s_i3cMasterSuppressedPendingMask[I3C_GetInstance(base)];
+}
+
+uint32_t I3C_MasterGetSuppressedStatusMask(I3C_Type *base)
+{
+    return s_i3cMasterSuppressedStatusMask[I3C_GetInstance(base)];
+}
+
+void I3C_MasterClearIrqEntryCount(I3C_Type *base)
+{
+    uint32_t instance = I3C_GetInstance(base);
+
+    s_i3cMasterIrqEntryCount[instance] = 0U;
+    s_i3cMasterControlIrqEntryCount[instance] = 0U;
+    s_i3cMasterDataIrqEntryCount[instance] = 0U;
+    s_i3cMasterSuppressedIrqCount[instance] = 0U;
+    s_i3cMasterSuppressedNvicPendingCount[instance] = 0U;
+    s_i3cMasterSuppressedPendingMask[instance] = 0U;
+    s_i3cMasterSuppressedStatusMask[instance] = 0U;
+    s_i3cMasterDataWindowActive[instance] = false;
+}
+
+void I3C_MasterSetIrqDataWindowActive(I3C_Type *base, bool isActive)
+{
+    s_i3cMasterDataWindowActive[I3C_GetInstance(base)] = isActive;
+}
+
+void I3C_MasterRecordSuppressedIrqState(I3C_Type *base,
+                                        uint32_t pendingMask,
+                                        uint32_t statusMask,
+                                        bool nvicPending)
+{
+    uint32_t instance = I3C_GetInstance(base);
+
+    if ((pendingMask != 0U) || nvicPending)
+    {
+        s_i3cMasterSuppressedIrqCount[instance]++;
+    }
+
+    if (nvicPending)
+    {
+        s_i3cMasterSuppressedNvicPendingCount[instance]++;
+    }
+
+    s_i3cMasterSuppressedPendingMask[instance] |= pendingMask;
+    s_i3cMasterSuppressedStatusMask[instance] |= statusMask;
 }
 
 /*!
@@ -3563,6 +3646,15 @@ static void I3C_CommonIRQHandler(I3C_Type *base, uint32_t instance)
     if (((uint32_t)kI3C_MasterOn == (base->MCONFIG & I3C_MCONFIG_MSTENA_MASK)) && (NULL != s_i3cMasterIsr))
     {
         /* Master mode. */
+        s_i3cMasterIrqEntryCount[instance]++;
+        if (s_i3cMasterDataWindowActive[instance])
+        {
+            s_i3cMasterDataIrqEntryCount[instance]++;
+        }
+        else
+        {
+            s_i3cMasterControlIrqEntryCount[instance]++;
+        }
         s_i3cMasterIsr(base, s_i3cMasterHandle[instance]);
     }
 

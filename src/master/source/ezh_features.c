@@ -23,6 +23,10 @@
 #define I3C_MWDATABE_OFFSET 0xB4
 #define I3C_MRDATAB_OFFSET 0xC0
 
+#define EZH_I3C_STATUS_RXREADY_MASK 0x800U
+#define EZH_I3C_STATUS_NONDATA_WAKE_LOW_MASK 0xA400U
+#define EZH_I3C_STATUS_NONDATA_WAKE_HIGH_MASK 0x80000U
+
 void SMARTDMA_CODE EZHB_I3CWriting(void);
 void SMARTDMA_CODE EZHB_I3CReading(void);
 
@@ -134,25 +138,75 @@ void SMARTDMA_CODE EZHB_I3CReading(void)
     E_ADD(R3, R2, R5);
     E_LOAD_IMM(R5, I3C_MDATACTRL_OFFSET);
     E_ADD(R6, R2, R5);
-    E_ADD_IMM(R7, PC, 0xFFC);
+    E_ADD_IMM(R7, PC, 0);
+    E_ADD_IMM(PC, PC, 4 * 4);
 
-E_LABEL("receive_loop");
+    E_DCD(read_wait_for_irq);
+    E_DCD(read_process_ready);
+    E_DCD(read_done_irq);
+    E_DCD(read_byte_loop);
+    E_DCD(read_end0);
+
+    E_SUB_IMMS(R4, R1, 0);
+    E_LDR(R4, R7, 2);
+    E_COND_GOTO_REGL(ZE, R4);
+
+E_LABEL("read_wait_for_irq");
+    E_HOLD;
+    E_LOAD_SIMM(R5, I3C_MSTATUS_OFFSET, 0);
+    E_ADD(R5, R2, R5);
+    E_LDR(R5, R5, 0);
+    E_MOVS(R4, R5);
+
+    E_LOAD_SIMM(GPD, (EZH_I3C_STATUS_RXREADY_MASK >> 8), 8);
+    E_ANDS(R5, R5, GPD);
+    E_LDR(R5, R7, 1);
+    E_COND_GOTO_REGL(NZ, R5);
+
+    E_LOAD_SIMM(R5, (EZH_I3C_STATUS_NONDATA_WAKE_LOW_MASK >> 8), 8);
+    E_LOAD_SIMM(GPD, (EZH_I3C_STATUS_NONDATA_WAKE_HIGH_MASK >> 16), 16);
+    E_ORS(R5, R5, GPD);
+    E_ANDS(R4, R4, R5);
+    E_LDR(R4, R7, 2);
+    E_COND_GOTO_REGL(NZ, R4);
+
+    E_LDR(R4, R7, 0);
+    E_COND_GOTO_REGL(EU, R4);
+
+E_LABEL("read_process_ready");
     E_LDR(R5, R6, 0);
     E_LOAD_SIMM(R4, 0x1F, 24);
     E_AND_LSRS(R5, R5, R4, 24);
-    E_COND_GOTO_REGL(ZE, R7);
+    E_SUB_IMMS(R4, R5, 0);
+    E_LDR(R4, R7, 0);
+    E_COND_GOTO_REGL(ZE, R4);
+
+    E_LDR(R4, R7, 3);
+    E_COND_GOTO_REGL(EU, R4);
+
+E_LABEL("read_byte_loop");
+    E_SUB_IMMS(R4, R1, 0);
+    E_LDR(R4, R7, 2);
+    E_COND_GOTO_REGL(ZE, R4);
+
+    E_SUB_IMMS(R4, R5, 0);
+    E_LDR(R4, R7, 0);
+    E_COND_GOTO_REGL(ZE, R4);
 
     E_LDR(R4, R3, 0);
     E_STRB(R0, R4, 0);
     E_ADD_IMM(R0, R0, 1);
     E_SUB_IMMS(R1, R1, 1);
-    E_COND_GOTO_REGL(NZ, R7);
+    E_SUB_IMMS(R5, R5, 1);
+    E_LDR(R4, R7, 3);
+    E_COND_GOTO_REGL(EU, R4);
 
+E_LABEL("read_done_irq");
     E_INT_TRIGGER(0);
 
-E_LABEL("end0");
+E_LABEL("read_end0");
     E_NOP;
-    E_GOSUB(end0);
+    E_GOSUB(read_end0);
 }
 
 void keep_smartdma_api_alive(void)
