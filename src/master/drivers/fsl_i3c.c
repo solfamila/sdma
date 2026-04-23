@@ -3372,6 +3372,10 @@ static void I3C_SlaveTransferHandleBusStop(I3C_Type *base,
             --handle->transfer.transferredCount;
             handle->wasTransmit = false;
         }
+        else if (handle->rxDataBase != NULL)
+        {
+            handle->transfer.transferredCount = handle->rxDataSize - handle->transfer.rxDataSize;
+        }
 
         if ((0UL != (handle->eventMask & handle->transfer.event)) && (NULL != handle->callback))
         {
@@ -3380,6 +3384,8 @@ static void I3C_SlaveTransferHandleBusStop(I3C_Type *base,
 
         /* Clean up transfer info on completion, after the callback has been invoked. */
         (void)memset(&handle->transfer, 0, sizeof(handle->transfer));
+        handle->rxDataBase = NULL;
+        handle->rxDataSize = 0U;
     }
 }
 
@@ -3450,6 +3456,7 @@ static void I3C_SlaveTransferHandleRxReady(I3C_Type *base,
                                            i3c_slave_handleIrq_param_t *stateParams)
 {
     assert(NULL != base && NULL != handle && NULL != stateParams);
+    handle->wasTransmit = false;
     /* If we're out of room in the buffer, invoke callback to get another. */
     if ((NULL == handle->transfer.rxData) || (0UL == handle->transfer.rxDataSize))
     {
@@ -3463,6 +3470,8 @@ static void I3C_SlaveTransferHandleRxReady(I3C_Type *base,
         {
             handle->callback(base, &handle->transfer, handle->userData);
         }
+        handle->rxDataBase = handle->transfer.rxData;
+        handle->rxDataSize = handle->transfer.rxDataSize;
         handle->transferredCount = 0;
     }
     /* Receive a byte. */

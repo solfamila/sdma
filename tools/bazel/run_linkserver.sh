@@ -11,24 +11,36 @@ else
   SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
   WORKSPACE_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 fi
+. "$WORKSPACE_DIR/tools/bazel/linkserver_common.sh"
 LINKSERVER=${LINKSERVER_BIN:-$WORKSPACE_DIR/.local/linkserver/extracted/flatten_LinkServer_25.12.83.pkg/Payload/LinkServer}
 PROBE=${RT595_PROBE:-$DEFAULT_PROBE}
 DEVICE=${RT595_DEVICE:-MIMXRT595S:EVK-MIMXRT595}
 MODE=${RT595_MODE:-$DEFAULT_MODE}
 EXIT_TIMEOUT=${RT595_EXIT_TIMEOUT:-5}
 
+RT595_LINKSERVER_PROBE=$PROBE
+RT595_LINKSERVER_DEVICE=$DEVICE
+
 case "$MODE" in
   semihost)
-    exec "$LINKSERVER" run -p "$PROBE" --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
+    rt595_run_linkserver_checked \
+      "running $(basename "$ELF_PATH") in semihost mode" \
+      "$LINKSERVER" run -p "$PROBE" --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
     ;;
   serial-dtay)
-    exec "$LINKSERVER" run -p "$PROBE" --mode serial:/dev/cu.usbmodemDTAYCQLQ2:115200 --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
+    rt595_run_linkserver_checked \
+      "running $(basename "$ELF_PATH") on /dev/cu.usbmodemDTAYCQLQ2" \
+      "$LINKSERVER" run -p "$PROBE" --mode serial:/dev/cu.usbmodemDTAYCQLQ2:115200 --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
     ;;
   serial-gra)
-    exec "$LINKSERVER" run -p "$PROBE" --mode serial:/dev/cu.usbmodemGRA1CQLQ2:115200 --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
+    rt595_run_linkserver_checked \
+      "running $(basename "$ELF_PATH") on /dev/cu.usbmodemGRA1CQLQ2" \
+      "$LINKSERVER" run -p "$PROBE" --mode serial:/dev/cu.usbmodemGRA1CQLQ2:115200 --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
     ;;
   serial:*)
-    exec "$LINKSERVER" run -p "$PROBE" --mode "$MODE" --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
+    rt595_run_linkserver_checked \
+      "running $(basename "$ELF_PATH") on ${MODE#serial:}" \
+      "$LINKSERVER" run -p "$PROBE" --mode "$MODE" --exit-timeout "$EXIT_TIMEOUT" "$DEVICE" "$ELF_PATH"
     ;;
   *)
     echo "unsupported RT595_MODE: $MODE" >&2

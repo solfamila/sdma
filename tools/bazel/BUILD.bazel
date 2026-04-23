@@ -1,4 +1,5 @@
 load("@pigweed//pw_build:merge_flags.bzl", "flags_from_dict")
+load("@pigweed//third_party/freertos:flags.bzl", "FREERTOS_FLAGS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -22,5 +23,40 @@ platform(
         "@pigweed//pw_assert:check_backend_impl": "@pigweed//pw_assert_basic:impl",
         "@pigweed//pw_log:backend": "//src/master:pw_log_backend_headers",
         "@pigweed//pw_log:backend_impl": "//src/master:pigweed_log_backend",
+    }),
+)
+
+platform(
+    name = "mimxrt595_fastboot_bootloader_platform",
+    constraint_values = [
+        "@pigweed//targets/mimxrt595_evk_freertos:freertos_config_cv",
+        "@pigweed//pw_build/constraints/rtos:freertos",
+        "@pigweed//pw_interrupt_cortex_m:backend",
+        "@pigweed//pw_build/constraints/board:mimxrt595_evk",
+        "@pigweed//pw_malloc_freertos:backend",
+        "@pigweed//pw_build/constraints/arm:cortex-m33",
+        "@freertos//:port_ARM_CM33_NTZ",
+        "@freertos//:malloc_heap_4",
+        "@freertos//:disable_task_statics",
+        "@platforms//cpu:armv8-m",
+        "@platforms//os:linux",
+        "@mcuxpresso//:middleware.freertos-kernel.MIMXRT595S",
+    ],
+    flags = flags_from_dict(FREERTOS_FLAGS | {
+        "@freertos//:freertos_config": "@pigweed//targets/mimxrt595_evk_freertos:freertos_config",
+        "@pigweed//pw_assert:assert_backend": "@pigweed//pw_assert_basic",
+        "@pigweed//pw_assert:assert_backend_impl": "@pigweed//pw_assert_basic:impl",
+        "@pigweed//pw_assert:check_backend": "@pigweed//pw_assert_basic",
+        "@pigweed//pw_assert:check_backend_impl": "@pigweed//pw_assert_basic:impl",
+        "@pigweed//pw_boot:backend": "@pigweed//pw_boot_cortex_m:armv8m",
+        "@pigweed//pw_log:backend": "@pigweed//pw_log_basic",
+        "@pigweed//pw_log:backend_impl": "@pigweed//pw_log_basic:impl",
+        "@pigweed//pw_sys_io:backend": "@pigweed//pw_sys_io_mcuxpresso",
+        "@pigweed//pw_system:extra_platform_libs": "//src/master:fastboot_bootloader_extra_platform_libs",
+        "@pigweed//pw_thread_freertos:config_override": "//src/master:fastboot_thread_config_overrides",
+        "@pigweed//pw_function:config_override": "//src/master:fastboot_function_config_override",
+        "@pigweed//targets:mcuxpresso_sdk": "//src/master:mcuxpresso_sdk_fastboot",
+        "@mcuxpresso//:app_include": "//:mcuxpresso_app_include",
+        "@mcuxpresso//:user_defines": "//src/master:fastboot_mcuxpresso_user_defines",
     }),
 )

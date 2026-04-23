@@ -2,6 +2,18 @@ load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
 package(default_visibility = ["//visibility:public"])
 
+filegroup(
+    name = "mcuxpresso_app_include",
+    srcs = ["board.h"],
+)
+
+filegroup(
+    name = "arm_none_eabi_objcopy",
+    srcs = [
+        ".local/toolchains/arm-gnu-toolchain-15.2.rel1-darwin-arm64-arm-none-eabi/bin/arm-none-eabi-objcopy",
+    ],
+)
+
 alias(
     name = "master_pigweed_ram.elf",
     actual = "//src/master:master_pigweed_ram.elf",
@@ -10,6 +22,26 @@ alias(
 alias(
     name = "master_pigweed_flash.elf",
     actual = "//src/master:master_pigweed_flash.elf",
+)
+
+alias(
+    name = "master_fastboot_bootloader.elf",
+    actual = "//src/master:master_fastboot_bootloader.elf",
+)
+
+alias(
+    name = "master_pigweed_fastboot_app.elf",
+    actual = "//src/master:master_pigweed_fastboot_app.elf",
+)
+
+alias(
+    name = "master_fastboot_bootloader.fastboot",
+    actual = "//src/master:master_fastboot_bootloader_fastboot_pkg",
+)
+
+alias(
+    name = "master_pigweed_fastboot_app.fastboot",
+    actual = "//src/master:master_pigweed_fastboot_app_fastboot_pkg",
 )
 
 alias(
@@ -39,6 +71,26 @@ sh_binary(
     data = ["//src/master:master_pigweed_flash.elf"],
     args = [
         "$(location //src/master:master_pigweed_flash.elf)",
+        "PRASAQKQ",
+    ],
+)
+
+sh_binary(
+    name = "flash_master_fastboot_bootloader",
+    srcs = ["//tools/bazel:flash_linkserver.sh"],
+    data = ["//src/master:master_fastboot_bootloader.elf"],
+    args = [
+        "$(location //src/master:master_fastboot_bootloader.elf)",
+        "PRASAQKQ",
+    ],
+)
+
+sh_binary(
+    name = "flash_master_pigweed_fastboot_app",
+    srcs = ["//tools/bazel:flash_linkserver.sh"],
+    data = ["//src/master:master_pigweed_fastboot_app.elf"],
+    args = [
+        "$(location //src/master:master_pigweed_fastboot_app.elf)",
         "PRASAQKQ",
     ],
 )

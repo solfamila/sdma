@@ -1,5 +1,12 @@
 common --verbose_failures
 build --strip=never
 build --symlink_prefix=.bazel-
+build --copt=-Wno-error
+build --copt=-Wno-error=cast-qual
+build --copt=-Wno-error=shadow
+build --copt=-Wno-error=redundant-decls
+build --copt=-Wno-error=calloc-transposed-args
+build --cxxopt=-include
+build --cxxopt=cstdint
 
 try-import %workspace%/user.bazelrc

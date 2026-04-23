@@ -1,6 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@pigweed//pw_build:binary_tools.bzl", "pw_pad_binary")
+load("@pigweed//pw_build:pw_linker_script.bzl", "pw_linker_script")
 load("//tools/bazel:rt595_defs.bzl", "RT595_COMMON_COPTS", "RT595_COMMON_DEFINES", "RT595_LINKOPTS", "RT595_MASTER_COPTS", "RT595_MASTER_INCLUDES", "RT595_PIGWEED_DEFINES")
-load("//tools/bazel:transition.bzl", "mimxrt595_binary")
+load("//tools/bazel:transition.bzl", "mimxrt595_binary", "mimxrt595_fastboot_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -19,6 +21,7 @@ cc_library(
         "drivers/fsl_gpio.c",
         "drivers/fsl_i2s_bridge.c",
         "drivers/fsl_i3c.c",
+        "drivers/fsl_i3c_smartdma.c",
         "drivers/fsl_iap.c",
         "drivers/fsl_inputmux.c",
         "drivers/fsl_power.c",
@@ -27,6 +30,50 @@ cc_library(
         "drivers/fsl_usart.c",
         "flash_config/flash_config.c",
         "startup/startup_mimxrt595s_cm33.c",
+        "utilities/debug_console_lite/fsl_debug_console.c",
+        "utilities/fsl_assert.c",
+        "utilities/fsl_memcpy.S",
+        "utilities/str/fsl_str.c",
+    ],
+    hdrs = glob([
+        "CMSIS/**/*.h",
+        "board/**/*.h",
+        "component/**/*.h",
+        "device/**/*.h",
+        "drivers/**/*.h",
+        "flash_config/**/*.h",
+        "source/**/*.h",
+        "utilities/**/*.h",
+    ]),
+    includes = RT595_MASTER_INCLUDES,
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES,
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "rt595_sdk_core_no_startup",
+    srcs = [
+        "component/uart/fsl_adapter_usart.c",
+        "device/system_MIMXRT595S_cm33.c",
+        "drivers/fsl_cache.c",
+        "drivers/fsl_clock.c",
+        "drivers/fsl_common.c",
+        "drivers/fsl_common_arm.c",
+        "drivers/fsl_dsp.c",
+        "drivers/fsl_flexcomm.c",
+        "drivers/fsl_flexspi.c",
+        "drivers/fsl_gpio.c",
+        "drivers/fsl_i2s_bridge.c",
+        "drivers/fsl_i3c.c",
+        "drivers/fsl_i3c_smartdma.c",
+        "drivers/fsl_iap.c",
+        "drivers/fsl_inputmux.c",
+        "drivers/fsl_power.c",
+        "drivers/fsl_reset.c",
+        "drivers/fsl_smartdma.c",
+        "drivers/fsl_usart.c",
+        "flash_config/flash_config.c",
         "utilities/debug_console_lite/fsl_debug_console.c",
         "utilities/fsl_assert.c",
         "utilities/fsl_memcpy.S",
@@ -104,6 +151,236 @@ cc_library(
 )
 
 cc_library(
+    name = "fastboot_thread_config_overrides",
+    defines = [
+        "PW_THREAD_FREERTOS_CONFIG_DEFAULT_STACK_SIZE_WORDS=2048",
+    ],
+)
+
+cc_library(
+    name = "fastboot_function_config_override",
+    defines = [
+        "PW_FUNCTION_ENABLE_DYNAMIC_ALLOCATION=1",
+    ],
+)
+
+cc_library(
+    name = "fastboot_mcuxpresso_user_defines",
+    defines = RT595_COMMON_DEFINES + [
+        "SDK_OS_FREE_RTOS",
+        "FSL_RTOS_FREE_RTOS",
+        "USB_STACK_USE_DEDICATED_RAM=1",
+    ],
+    deps = [
+        "@pigweed//third_party/freertos:support",
+    ],
+)
+
+cc_library(
+    name = "fastboot_defines",
+    hdrs = ["fastboot/bootloader.h"],
+    includes = ["fastboot"],
+    defines = [
+        "FASTBOOT_FLASH_BASE=0x08000000",
+        "FASTBOOT_FLASH_SIZE=0x4000000",
+        "FASTBOOT_BOOTLOADER_BEGIN=0x00001000",
+        "FASTBOOT_BOOTLOADER_SIZE=0x80000",
+        "FASTBOOT_APP_VECTOR_TABLE=(FASTBOOT_BOOTLOADER_BEGIN+FASTBOOT_BOOTLOADER_SIZE)",
+        "FASTBOOT_APP_SIZE=(FASTBOOT_FLASH_SIZE-FASTBOOT_APP_VECTOR_TABLE)",
+        "FASTBOOT_BOOT_DATA_BASE=0x20007F00",
+    ],
+)
+
+cc_library(
+    name = "rt595_fastboot_board_support",
+    srcs = [
+        "board/clock_config.c",
+        "fastboot/config/board.c",
+        "fastboot/config/pin_mux.c",
+    ],
+    hdrs = [
+        "board/clock_config.h",
+        "fastboot/config/board.h",
+        "fastboot/config/pin_mux.h",
+    ],
+    includes = [
+        "fastboot/config",
+        "board",
+    ],
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES + [
+        "SDK_OS_FREE_RTOS",
+        "FSL_RTOS_FREE_RTOS",
+        "USB_STACK_USE_DEDICATED_RAM=1",
+    ],
+    deps = [
+        ":rt595_sdk_core_no_startup",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "mcuxpresso_sdk_fastboot",
+    defines = RT595_COMMON_DEFINES + [
+        "SDK_OS_FREE_RTOS",
+        "FSL_RTOS_FREE_RTOS",
+        "USB_STACK_USE_DEDICATED_RAM=1",
+    ],
+    deps = [
+        ":rt595_fastboot_board_support",
+        ":rt595_sdk_core_no_startup",
+        "@mcuxpresso//:component.mflash.rt595.MIMXRT595S",
+        "@mcuxpresso//:middleware.usb.common_header.MIMXRT595S",
+        "@mcuxpresso//:middleware.usb.device.common_header.MIMXRT595S",
+        "@mcuxpresso//:middleware.usb.device.controller.driver.MIMXRT595S",
+        "@mcuxpresso//:middleware.usb.device.ip3511hs_config_header.MIMXRT595S",
+        "@mcuxpresso//:middleware.usb.device_controller_ip3511hs.MIMXRT595S",
+        "@mcuxpresso//:middleware.usb.phy.MIMXRT595S",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "fastboot_usb_transport_support",
+    srcs = [
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_cdc_acm.c",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_ch9.c",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_class.c",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_descriptor.c",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/virtual_com.c",
+    ],
+    hdrs = [
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/fastboot.h",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_cdc_acm.h",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_ch9.h",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_class.h",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_config.h",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/usb_device_descriptor.h",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party/virtual_com.h",
+    ],
+    includes = [
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/third_party",
+    ],
+    copts = RT595_MASTER_COPTS + [
+        "-mno-unaligned-access",
+    ],
+    defines = RT595_COMMON_DEFINES + [
+        "SDK_OS_FREE_RTOS",
+        "FSL_RTOS_FREE_RTOS",
+        "USB_STACK_USE_DEDICATED_RAM=1",
+    ],
+    deps = [
+        ":mcuxpresso_sdk_fastboot",
+        "@pigweed//third_party/freertos:support",
+    ],
+)
+
+cc_library(
+    name = "fastboot_usb_transport",
+    srcs = [
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/packet_mimxrt595evk.cc",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/private/packet_mimxrt595evk.h",
+    ],
+    hdrs = [
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/public/pw_fastboot_usb_mcuxpresso/packet_mimxrt595evk.h",
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/public/pw_fastboot_usb_mcuxpresso/transport.h",
+    ],
+    includes = [
+        "fastboot/lib/pw_fastboot_usb_mcuxpresso/public",
+    ],
+    deps = [
+        ":fastboot_usb_transport_support",
+        "@pigweed//pw_fastboot",
+        "@pigweed//pw_fastboot_usb",
+    ],
+)
+
+cc_library(
+    name = "fastboot_bootloader_linker_script_defines",
+    defines = [
+        "PW_BOOT_VECTOR_TABLE_BEGIN=(FASTBOOT_FLASH_BASE+FASTBOOT_BOOTLOADER_BEGIN)",
+        "PW_BOOT_VECTOR_TABLE_SIZE=0x180",
+        "PW_BOOT_FLASH_BEGIN=(PW_BOOT_VECTOR_TABLE_BEGIN+PW_BOOT_VECTOR_TABLE_SIZE)",
+        "PW_BOOT_FLASH_SIZE=(FASTBOOT_BOOTLOADER_SIZE-PW_BOOT_VECTOR_TABLE_SIZE)",
+        "PW_BOOT_HEAP_SIZE=200K",
+        "PW_BOOT_MIN_STACK_SIZE=1K",
+        "PW_BOOT_RAM_BEGIN=(0x20080000+FASTBOOT_BOOTLOADER_SIZE)",
+        "PW_BOOT_RAM_SIZE=(0x00280000-FASTBOOT_BOOTLOADER_SIZE)",
+        "MIMXRT595_IMAGE_BASE=0x20080000",
+    ],
+    deps = [
+        ":fastboot_defines",
+    ],
+)
+
+pw_linker_script(
+    name = "fastboot_bootloader_linker_script",
+    linker_script = "fastboot/mimxrt595_flash.ld",
+    deps = [
+        ":fastboot_bootloader_linker_script_defines",
+    ],
+)
+
+cc_library(
+    name = "fastboot_boot_support",
+    srcs = [
+        "fastboot/boot.cc",
+        "fastboot/syscalls.c",
+        "fastboot/vector_table.c",
+    ],
+    defines = [
+        "PW_MALLOC_ACTIVE=1",
+    ],
+    deps = [
+        ":fastboot_defines",
+        ":mcuxpresso_sdk_fastboot",
+        "@pigweed//pw_boot",
+        "@pigweed//pw_boot_cortex_m",
+        "@pigweed//pw_assert_basic:impl",
+        "@pigweed//pw_malloc",
+        "@pigweed//pw_preprocessor",
+        "@pigweed//pw_sys_io_mcuxpresso",
+        "@pigweed//third_party/freertos:support",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "fastboot_bootloader_extra_platform_libs",
+    alwayslink = 1,
+    deps = [
+        ":fastboot_boot_support",
+        ":fastboot_bootloader_linker_script",
+        "@pigweed//pw_tokenizer:linker_script",
+        "@pigweed//pw_toolchain:wrap_abort",
+    ],
+)
+
+cc_library(
+    name = "master_fastboot_bootloader_sources",
+    srcs = [
+        "fastboot/flash.cc",
+        "fastboot/main.cc",
+    ],
+    hdrs = [
+        "fastboot/flash.h",
+    ],
+    deps = [
+        ":fastboot_defines",
+        ":fastboot_usb_transport",
+        ":mcuxpresso_sdk_fastboot",
+        "@pigweed//pw_chrono:wrap_time_system_clock",
+        "@pigweed//pw_fastboot",
+        "@pigweed//pw_flash",
+        "@pigweed//pw_flash_mcuxpresso",
+        "@pigweed//pw_log",
+        "@pigweed//pw_status",
+        "@pigweed//third_party/freertos:support",
+        "@pigweed//third_party/aosp:libsparse",
+    ],
+)
+
+cc_library(
     name = "master_pigweed_variant",
     srcs = ["variants/ezh_test_master_pigweed.c"],
     copts = RT595_MASTER_COPTS,
@@ -151,4 +428,73 @@ cc_binary(
 mimxrt595_binary(
     name = "master_pigweed_flash.elf",
     binary = ":master_pigweed_flash_bin",
+)
+
+cc_binary(
+    name = "master_fastboot_bootloader_bin",
+    linkopts = [
+        "-nostartfiles",
+        "-lstdc++",
+        "-lsupc++",
+        "-lm",
+    ],
+    deps = [
+        ":fastboot_bootloader_extra_platform_libs",
+        ":master_fastboot_bootloader_sources",
+    ],
+)
+
+mimxrt595_fastboot_binary(
+    name = "master_fastboot_bootloader.elf",
+    binary = ":master_fastboot_bootloader_bin",
+)
+
+genrule(
+    name = "master_fastboot_bootloader_binfile",
+    srcs = [":master_fastboot_bootloader.elf"],
+    outs = ["master_fastboot_bootloader.bin"],
+    tools = ["//:arm_none_eabi_objcopy"],
+    cmd = "elf=''; for file in $(locations :master_fastboot_bootloader.elf); do case $$file in *.elf) elf=$$file ;; esac; done; test -n \"$$elf\" && $(location //:arm_none_eabi_objcopy) -Obinary -R .flash_config \"$$elf\" $@",
+)
+
+pw_pad_binary(
+    name = "master_fastboot_bootloader_fastboot_pkg",
+    bin_input = ":master_fastboot_bootloader_binfile",
+    bin_out = "master_fastboot_bootloader.fastboot",
+    pad_to_alignment = 4096,
+    pad_byte = 0xFF,
+)
+
+cc_binary(
+    name = "master_pigweed_fastboot_app_bin",
+    deps = [
+        ":master_pigweed_variant",
+        ":pigweed_log_backend",
+        ":rt595_board_support",
+        ":rt595_master_runtime",
+        ":rt595_sdk_core",
+    ],
+    additional_linker_inputs = ["evkmimxrt595_ezhb_FastbootApp.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_FastbootApp.ld)"],
+)
+
+mimxrt595_binary(
+    name = "master_pigweed_fastboot_app.elf",
+    binary = ":master_pigweed_fastboot_app_bin",
+)
+
+genrule(
+    name = "master_pigweed_fastboot_app_binfile",
+    srcs = [":master_pigweed_fastboot_app.elf"],
+    outs = ["master_pigweed_fastboot_app.bin"],
+    tools = ["//:arm_none_eabi_objcopy"],
+    cmd = "elf=''; for file in $(locations :master_pigweed_fastboot_app.elf); do case $$file in *.elf) elf=$$file ;; esac; done; test -n \"$$elf\" && $(location //:arm_none_eabi_objcopy) -Obinary -R .flash_conf \"$$elf\" $@",
+)
+
+pw_pad_binary(
+    name = "master_pigweed_fastboot_app_fastboot_pkg",
+    bin_input = ":master_pigweed_fastboot_app_binfile",
+    bin_out = "master_pigweed_fastboot_app.fastboot",
+    pad_to_alignment = 4096,
+    pad_byte = 0xFF,
 )

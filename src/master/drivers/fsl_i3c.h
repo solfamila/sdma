@@ -618,6 +618,8 @@ struct _i3c_slave_handle
     bool wasTransmit;                       /*!< Whether the last transfer was a transmit. */
     uint32_t eventMask;                     /*!< Mask of enabled events. */
     uint32_t transferredCount;              /*!< Count of bytes transferred. */
+    uint8_t *rxDataBase;                    /*!< Current RX buffer base pointer. */
+    size_t rxDataSize;                      /*!< Current RX buffer size when it was supplied. */
     i3c_slave_transfer_callback_t callback; /*!< Callback function called at transfer event. */
     void *userData;                         /*!< Callback parameter passed to callback. */
     size_t txFifoSize;                      /*!< Tx Fifo size */

@@ -6,6 +6,7 @@ module(
 bazel_dep(name = "pigweed")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "pw_toolchain")
+bazel_dep(name = "freertos", version = "10.5.1.bcr.2")
 bazel_dep(name = "rules_cc", version = "0.2.17")
 bazel_dep(name = "rules_platform", version = "0.1.0")
 bazel_dep(name = "rules_shell", version = "0.6.1")
@@ -30,3 +31,7 @@ archive_override(
 register_toolchains(
     "@pigweed//pw_toolchain/arm_gcc:arm_gcc_cc_toolchain_cortex-m33",
 )
+
+mcuxpresso = use_extension("@pigweed//third_party/mcuxpresso:extensions.bzl", "mcuxpresso")
+mcuxpresso.source_commit(sha = "059f4d87bc1a4beb3900bdc10b9ecbe0f3015081")
+use_repo(mcuxpresso, "mcuxpresso")

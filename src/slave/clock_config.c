@@ -41,9 +41,6 @@ board: MIMXRT595-EVK
 /*******************************************************************************
  * Variables
  ******************************************************************************/
-/* System clock frequency. */
-extern uint32_t SystemCoreClock;
-
 /*FUNCTION**********************************************************************
  *
  * Function Name : BOARD_FlexspiClockSafeConfig
