@@ -112,7 +112,7 @@ static void I3C_MasterSmartDMAEnterDataPhase(
 
     handle->dataIrqMask = dataIrqMask;
 
-    if (handle->transfer.direction == kI3C_Read)
+    if ((handle->transfer.direction == kI3C_Read) || (handle->transfer.direction == kI3C_Write))
     {
         instance = I3C_GetInstance(base);
 
@@ -123,7 +123,14 @@ static void I3C_MasterSmartDMAEnterDataPhase(
 
         handle->cpuIrqMasked = true;
         I3C_MasterSetIrqDataWindowActive(base, true);
-        I3C_MasterEnableInterrupts(base, dataIrqMask);
+        if (handle->transfer.direction == kI3C_Read)
+        {
+            I3C_MasterEnableInterrupts(base, dataIrqMask);
+        }
+        else
+        {
+            I3C_MasterDisableInterrupts(base, dataIrqMask);
+        }
         return;
     }
 
