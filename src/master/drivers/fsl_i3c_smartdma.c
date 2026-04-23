@@ -85,6 +85,8 @@ static void I3C_MasterSmartDMAEnterDataPhase(
 
 static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle);
 
+static void I3C_MasterSmartDMASetTxTriggerLevel(I3C_Type *base, i3c_tx_trigger_level_t txLevel);
+
 static void I3C_MasterRunSmartDMATransfer(
     I3C_Type *base, i3c_master_smartdma_handle_t *handle, void *data, size_t dataSize, i3c_direction_t direction);
 
@@ -109,16 +111,25 @@ static void I3C_MasterSmartDMAEnterDataPhase(
     }
 
     handle->dataIrqMask = dataIrqMask;
-    instance = I3C_GetInstance(base);
 
-    DisableIRQ(kI3cIrqs[instance]);
-    NVIC_ClearPendingIRQ(kI3cIrqs[instance]);
-    __DSB();
-    __ISB();
+    if (handle->transfer.direction == kI3C_Read)
+    {
+        instance = I3C_GetInstance(base);
 
-    handle->cpuIrqMasked = true;
+        DisableIRQ(kI3cIrqs[instance]);
+        NVIC_ClearPendingIRQ(kI3cIrqs[instance]);
+        __DSB();
+        __ISB();
+
+        handle->cpuIrqMasked = true;
+        I3C_MasterSetIrqDataWindowActive(base, true);
+        I3C_MasterEnableInterrupts(base, dataIrqMask);
+        return;
+    }
+
+    handle->cpuIrqMasked = false;
     I3C_MasterSetIrqDataWindowActive(base, true);
-    I3C_MasterEnableInterrupts(base, dataIrqMask);
+    I3C_MasterDisableInterrupts(base, dataIrqMask);
 }
 
 static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle)
@@ -145,6 +156,12 @@ static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_
         handle->dataIrqMask = 0U;
     }
 
+    if (handle->txTriggerAdjusted)
+    {
+        I3C_MasterSmartDMASetTxTriggerLevel(base, (i3c_tx_trigger_level_t)handle->savedTxTriggerLevel);
+        handle->txTriggerAdjusted = false;
+    }
+
     if (!handle->cpuIrqMasked)
     {
         return;
@@ -155,6 +172,14 @@ static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_
     __ISB();
     EnableIRQ(kI3cIrqs[instance]);
     handle->cpuIrqMasked = false;
+}
+
+static void I3C_MasterSmartDMASetTxTriggerLevel(I3C_Type *base, i3c_tx_trigger_level_t txLevel)
+{
+    uint32_t rxTriggerLevel;
+
+    rxTriggerLevel = (base->MDATACTRL & I3C_MDATACTRL_RXTRIG_MASK) >> I3C_MDATACTRL_RXTRIG_SHIFT;
+    I3C_MasterSetWatermarks(base, txLevel, (i3c_rx_trigger_level_t)rxTriggerLevel, false, false);
 }
 
 void EZH_Callback(void *param)
@@ -260,6 +285,8 @@ static void I3C_MasterRunSmartDMATransfer(
     handle->smartdmaCompletionPending = true;
     handle->smartdmaReadTailPending = false;
     handle->dataIrqMask = 0U;
+    handle->cpuIrqMasked = false;
+    handle->txTriggerAdjusted = false;
     handle->smartdmaParam.addr = (uint32_t *)data;
     handle->smartdmaParam.dataSize = dataSize;
     handle->smartdmaParam.i3cBaseAddress = (uint32_t *)(uintptr_t)base;
@@ -271,6 +298,10 @@ static void I3C_MasterRunSmartDMATransfer(
     {
         instance = I3C_GetInstance(base);
         dataIrqMask = (uint32_t)kI3C_MasterTxReadyFlag;
+        handle->savedTxTriggerLevel =
+            (uint8_t)((base->MDATACTRL & I3C_MDATACTRL_TXTRIG_MASK) >> I3C_MDATACTRL_TXTRIG_SHIFT);
+        I3C_MasterSmartDMASetTxTriggerLevel(base, kI3C_TxTriggerOnEmpty);
+        handle->txTriggerAdjusted = true;
         if (dataSize != 1U)
         {
             i3cEndByte[instance] = ((uint8_t *)data)[dataSize - 1U];
@@ -460,6 +491,12 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
     errStatus = I3C_MasterGetErrorStatusFlags(base);
     result = I3C_MasterCheckAndClearError(base, errStatus);
     if (kStatus_Success != result)
+    {
+        return result;
+    }
+
+    if ((handle->state == (uint8_t)kWaitForCompletionState) && handle->smartdmaCompletionPending &&
+        (statusToHandle == 0U) && (errStatus == 0U))
     {
         return result;
     }

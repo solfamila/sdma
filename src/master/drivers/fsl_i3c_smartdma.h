@@ -62,7 +62,9 @@ struct _i3c_master_smartdma_handle
     uint32_t dataIrqMask;                   /*!< FIFO-ready IRQ source temporarily handed to SmartDMA. */
     bool smartdmaCompletionPending;         /*!< Tail-byte SmartDMA completion has not run yet. */
     bool smartdmaReadTailPending;           /*!< The final read byte still needs to be drained from the FIFO. */
-    bool cpuIrqMasked;                      /*!< CM33 I3C NVIC line is masked during the SmartDMA data phase. */
+    bool cpuIrqMasked;                      /*!< Legacy flag for CM33-side NVIC masking during SmartDMA data phase. */
+    bool txTriggerAdjusted;                 /*!< Write-side TX watermark is temporarily overridden for SmartDMA pacing. */
+    uint8_t savedTxTriggerLevel;            /*!< Original TX watermark restored when the SmartDMA data phase ends. */
     uint8_t subaddressBuffer[4];            /*!< Saving subaddress command. */
     uint8_t subaddressCount;                /*!< Saving command count. */
     i3c_master_transfer_t transfer;         /*!< Copy of the current transfer info. */
