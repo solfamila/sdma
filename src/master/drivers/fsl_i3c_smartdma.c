@@ -332,10 +332,12 @@ static void I3C_MasterRunSmartDMATransfer(
 
     if (direction == kI3C_Write)
     {
+        /* Writes enter the masked data window immediately because data phase starts as soon as SmartDMA boots. */
         I3C_MasterSmartDMAEnterDataPhase(base, handle, dataIrqMask);
     }
     else
     {
+        /* Reads defer the masked window until the repeated-start receive phase is active. */
         handle->dataIrqMask = dataIrqMask;
     }
 
@@ -655,6 +657,7 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
             case (uint8_t)kReceiveDataState:
                 if ((handle->transfer.direction == kI3C_Read) && !handle->cpuIrqMasked && (handle->dataIrqMask != 0U))
                 {
+                    /* The receive data window starts only after repeated start completes, so mask CM33 here. */
                     I3C_MasterSmartDMAEnterDataPhase(base, handle, handle->dataIrqMask);
                 }
                 handle->state = (uint8_t)kWaitForCompletionState;
