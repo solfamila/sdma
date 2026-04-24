@@ -140,6 +140,26 @@ static void log_post_return_snapshot(const char *phase,
     log_status_info(label, postReturnNvicPending);
 }
 
+static void log_smartdma_window_metrics(const char *phase, const i3c_master_smartdma_handle_t *handle)
+{
+    char label[96];
+
+    (void)snprintf(label, sizeof(label), "master: %s smartdma active-window irq count=", phase);
+    log_status_info(label, handle->smartdmaWindowIrqCount);
+    (void)snprintf(label, sizeof(label), "master: %s smartdma fifo bounce count=", phase);
+    log_status_info(label, handle->smartdmaFifoReadyBounceCount);
+    (void)snprintf(label, sizeof(label), "master: %s smartdma protocol bounce count=", phase);
+    log_status_info(label, handle->smartdmaProtocolBounceCount);
+    (void)snprintf(label, sizeof(label), "master: %s smartdma mailbox protocol count=", phase);
+    log_status_info(label, handle->smartdmaMailboxProtocolCount);
+    (void)snprintf(label, sizeof(label), "master: %s smartdma pending mask=", phase);
+    log_status_info(label, handle->smartdmaWindowPendingMask);
+    (void)snprintf(label, sizeof(label), "master: %s smartdma fifo mask=", phase);
+    log_status_info(label, handle->smartdmaWindowFifoMask);
+    (void)snprintf(label, sizeof(label), "master: %s smartdma protocol mask=", phase);
+    log_status_info(label, handle->smartdmaWindowProtocolMask);
+}
+
 static void i3c_master_ibi_callback(I3C_Type *base,
                                     i3c_master_smartdma_handle_t *handle,
                                     i3c_ibi_type_t ibiType,
@@ -424,6 +444,7 @@ int main(void)
                         writeCpuIrqSuppressedPreDisableNvicCount,
                         writeCpuIrqSuppressedPreDisablePendingMask,
                         writeCpuIrqSuppressedPreDisableStatusMask);
+        log_smartdma_window_metrics("write", &g_i3c_m_handle);
         log_post_return_snapshot(
             "write", writePostReturnPendingMask, writePostReturnStatusMask, writePostReturnNvicPending);
         log_status_error("master: write transfer failed ", (uint32_t)result);
@@ -440,6 +461,7 @@ int main(void)
                     writeCpuIrqSuppressedPreDisableNvicCount,
                     writeCpuIrqSuppressedPreDisablePendingMask,
                     writeCpuIrqSuppressedPreDisableStatusMask);
+    log_smartdma_window_metrics("write", &g_i3c_m_handle);
     log_post_return_snapshot("write", writePostReturnPendingMask, writePostReturnStatusMask, writePostReturnNvicPending);
 
     for (volatile uint32_t delay = 0U; delay < WAIT_TIME; delay++)
@@ -482,6 +504,7 @@ int main(void)
                         readCpuIrqSuppressedPreDisableNvicCount,
                         readCpuIrqSuppressedPreDisablePendingMask,
                         readCpuIrqSuppressedPreDisableStatusMask);
+        log_smartdma_window_metrics("read", &g_i3c_m_handle);
         log_post_return_snapshot(
             "read", readPostReturnPendingMask, readPostReturnStatusMask, readPostReturnNvicPending);
         log_status_error("master: read transfer failed ", (uint32_t)result);
@@ -517,6 +540,7 @@ int main(void)
                     readCpuIrqSuppressedPreDisableNvicCount,
                     readCpuIrqSuppressedPreDisablePendingMask,
                     readCpuIrqSuppressedPreDisableStatusMask);
+    log_smartdma_window_metrics("read", &g_i3c_m_handle);
     log_post_return_snapshot("read", readPostReturnPendingMask, readPostReturnStatusMask, readPostReturnNvicPending);
 
     while (1)

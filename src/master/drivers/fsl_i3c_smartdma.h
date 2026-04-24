@@ -67,6 +67,13 @@ struct _i3c_master_smartdma_handle
     bool txTriggerAdjusted;                 /*!< Write-side TX watermark is temporarily overridden for SmartDMA pacing. */
     uint8_t savedTxTriggerLevel;            /*!< Original TX watermark restored when the SmartDMA data phase ends. */
     volatile uint32_t smartdmaMailbox;      /*!< SmartDMA-to-CM33 handoff reason written by the EZH program. */
+    uint32_t smartdmaWindowIrqCount;        /*!< CM33 IRQ entries observed while the SmartDMA data window was active. */
+    uint32_t smartdmaFifoReadyBounceCount;  /*!< Active-window IRQs treated as FIFO-ready fast returns. */
+    uint32_t smartdmaProtocolBounceCount;   /*!< Active-window IRQs escalated back into the CM33 state machine. */
+    uint32_t smartdmaMailboxProtocolCount;  /*!< Protocol escalations triggered by the SmartDMA mailbox reason. */
+    uint32_t smartdmaWindowPendingMask;     /*!< OR'd pending interrupt mask observed during the SmartDMA data window. */
+    uint32_t smartdmaWindowFifoMask;        /*!< OR'd FIFO-ready bits observed during the SmartDMA data window. */
+    uint32_t smartdmaWindowProtocolMask;    /*!< OR'd protocol/escalation bits observed during the SmartDMA data window. */
     uint8_t subaddressBuffer[4];            /*!< Saving subaddress command. */
     uint8_t subaddressCount;                /*!< Saving command count. */
     i3c_master_transfer_t transfer;         /*!< Copy of the current transfer info. */

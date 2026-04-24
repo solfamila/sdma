@@ -172,12 +172,26 @@ static bool I3C_MasterSmartDMAHandleActiveDataWindowIRQ(
 
     fifoReady = pendingInterrupts & (uint32_t)kMasterFifoReadyFlags;
     protocol = pendingInterrupts & (uint32_t)kMasterProtocolBounceFlags;
+    handle->smartdmaWindowIrqCount++;
+    handle->smartdmaWindowPendingMask |= pendingInterrupts;
+    handle->smartdmaWindowFifoMask |= fifoReady;
+    handle->smartdmaWindowProtocolMask |= protocol;
 
     if ((handle->smartdmaMailbox == (uint32_t)kSmartDMAMailboxProtocol) || (protocol != 0U))
     {
+        handle->smartdmaProtocolBounceCount++;
+        if (handle->smartdmaMailbox == (uint32_t)kSmartDMAMailboxProtocol)
+        {
+            handle->smartdmaMailboxProtocolCount++;
+        }
         handle->smartdmaMailbox = (uint32_t)kSmartDMAMailboxIdle;
         I3C_MasterSmartDMAStopDataPhase(base, handle);
         return false;
+    }
+
+    if (fifoReady != 0U)
+    {
+        handle->smartdmaFifoReadyBounceCount++;
     }
 
     return fifoReady != 0U;
@@ -309,6 +323,13 @@ static void I3C_MasterRunSmartDMATransfer(
     handle->smartdmaDataWindowActive = false;
     handle->txTriggerAdjusted = false;
     handle->smartdmaMailbox = (uint32_t)kSmartDMAMailboxIdle;
+    handle->smartdmaWindowIrqCount = 0U;
+    handle->smartdmaFifoReadyBounceCount = 0U;
+    handle->smartdmaProtocolBounceCount = 0U;
+    handle->smartdmaMailboxProtocolCount = 0U;
+    handle->smartdmaWindowPendingMask = 0U;
+    handle->smartdmaWindowFifoMask = 0U;
+    handle->smartdmaWindowProtocolMask = 0U;
     handle->smartdmaParam.addr = (uint32_t *)data;
     handle->smartdmaParam.dataSize = dataSize;
     handle->smartdmaParam.i3cBaseAddress = (uint32_t *)(uintptr_t)base;
