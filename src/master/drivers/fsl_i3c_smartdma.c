@@ -62,6 +62,15 @@ enum _i3c_smartdma_flag_constants
                        kI3C_SlaveErrorTermFlag | kI3C_SlaveErrorInvalidStartFlag | kI3C_SlaveErrorSdrParityFlag |
                        kI3C_SlaveErrorHdrParityFlag | kI3C_SlaveErrorHdrCRCFlag | kI3C_SlaveErrorS0S1Flag |
                        kI3C_SlaveErrorOverreadFlag | kI3C_SlaveErrorOverwriteFlag,
+
+    kMasterFifoReadyFlags = kI3C_MasterTxReadyFlag | kI3C_MasterRxReadyFlag,
+
+    kMasterProtocolBounceFlags =
+        kI3C_MasterSlaveStartFlag | kI3C_MasterArbitrationWonFlag | kI3C_MasterErrorFlag | kI3C_MasterSlave2MasterFlag,
+
+    kSmartDMAMailboxIdle = 0U,
+    kSmartDMAMailboxCompletion = 1U,
+    kSmartDMAMailboxProtocol = 2U,
 };
 
 /*******************************************************************************
@@ -80,10 +89,18 @@ static status_t I3C_MasterSmartDMAWaitForTxReady(I3C_Type *base, uint8_t byteCou
 
 static status_t I3C_MasterCompleteSmartDMAReadTail(i3c_master_smartdma_handle_t *handle);
 
+static void I3C_MasterSmartDMASetDataWindowActive(
+    I3C_Type *base, i3c_master_smartdma_handle_t *handle, bool isActive);
+
+static void I3C_MasterSmartDMAStopDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle);
+
 static void I3C_MasterSmartDMAEnterDataPhase(
     I3C_Type *base, i3c_master_smartdma_handle_t *handle, uint32_t dataIrqMask);
 
 static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle);
+
+static bool I3C_MasterSmartDMAHandleActiveDataWindowIRQ(
+    I3C_Type *base, i3c_master_smartdma_handle_t *handle, uint32_t pendingInterrupts);
 
 static void I3C_MasterSmartDMASetTxTriggerLevel(I3C_Type *base, i3c_tx_trigger_level_t txLevel);
 
@@ -100,62 +117,16 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
 /*******************************************************************************
  * Code
  ******************************************************************************/
-static void I3C_MasterSmartDMAEnterDataPhase(
-    I3C_Type *base, i3c_master_smartdma_handle_t *handle, uint32_t dataIrqMask)
+static void I3C_MasterSmartDMASetDataWindowActive(
+    I3C_Type *base, i3c_master_smartdma_handle_t *handle, bool isActive)
 {
-    uint32_t instance;
-
-    if (dataIrqMask == 0U)
-    {
-        return;
-    }
-
-    handle->dataIrqMask = dataIrqMask;
-
-    if ((handle->transfer.direction == kI3C_Read) || (handle->transfer.direction == kI3C_Write))
-    {
-        instance = I3C_GetInstance(base);
-
-        DisableIRQ(kI3cIrqs[instance]);
-        NVIC_ClearPendingIRQ(kI3cIrqs[instance]);
-        __DSB();
-        __ISB();
-
-        handle->cpuIrqMasked = true;
-        I3C_MasterSetIrqDataWindowActive(base, true);
-        if (handle->transfer.direction == kI3C_Read)
-        {
-            I3C_MasterEnableInterrupts(base, dataIrqMask);
-        }
-        else
-        {
-            I3C_MasterDisableInterrupts(base, dataIrqMask);
-        }
-        return;
-    }
-
-    handle->cpuIrqMasked = false;
-    I3C_MasterSetIrqDataWindowActive(base, true);
-    I3C_MasterDisableInterrupts(base, dataIrqMask);
+    handle->smartdmaDataWindowActive = isActive;
+    I3C_MasterSetIrqDataWindowActive(base, isActive);
 }
 
-static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle)
+static void I3C_MasterSmartDMAStopDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle)
 {
-    uint32_t instance;
-    uint32_t pendingMask = 0U;
-    uint32_t statusMask = 0U;
-    bool nvicPending = false;
-
-    if (handle->cpuIrqMasked)
-    {
-        instance = I3C_GetInstance(base);
-        pendingMask = I3C_MasterGetPendingInterrupts(base);
-        statusMask = base->MSTATUS;
-        nvicPending = NVIC_GetPendingIRQ(kI3cIrqs[instance]) != 0U;
-        I3C_MasterRecordSuppressedIrqState(base, pendingMask, statusMask, nvicPending);
-    }
-
-    I3C_MasterSetIrqDataWindowActive(base, false);
+    I3C_MasterSmartDMASetDataWindowActive(base, handle, false);
 
     if (handle->dataIrqMask != 0U)
     {
@@ -168,17 +139,48 @@ static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_
         I3C_MasterSmartDMASetTxTriggerLevel(base, (i3c_tx_trigger_level_t)handle->savedTxTriggerLevel);
         handle->txTriggerAdjusted = false;
     }
+}
 
-    if (!handle->cpuIrqMasked)
+static void I3C_MasterSmartDMAEnterDataPhase(
+    I3C_Type *base, i3c_master_smartdma_handle_t *handle, uint32_t dataIrqMask)
+{
+    if (dataIrqMask == 0U)
     {
         return;
     }
 
-    NVIC_ClearPendingIRQ(kI3cIrqs[instance]);
-    __DSB();
-    __ISB();
-    EnableIRQ(kI3cIrqs[instance]);
-    handle->cpuIrqMasked = false;
+    handle->dataIrqMask = dataIrqMask;
+    I3C_MasterSmartDMASetDataWindowActive(base, handle, true);
+    I3C_MasterDisableInterrupts(base, dataIrqMask);
+}
+
+static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle)
+{
+    I3C_MasterSmartDMAStopDataPhase(base, handle);
+}
+
+static bool I3C_MasterSmartDMAHandleActiveDataWindowIRQ(
+    I3C_Type *base, i3c_master_smartdma_handle_t *handle, uint32_t pendingInterrupts)
+{
+    uint32_t fifoReady;
+    uint32_t protocol;
+
+    if (!handle->smartdmaDataWindowActive)
+    {
+        return false;
+    }
+
+    fifoReady = pendingInterrupts & (uint32_t)kMasterFifoReadyFlags;
+    protocol = pendingInterrupts & (uint32_t)kMasterProtocolBounceFlags;
+
+    if ((handle->smartdmaMailbox == (uint32_t)kSmartDMAMailboxProtocol) || (protocol != 0U))
+    {
+        handle->smartdmaMailbox = (uint32_t)kSmartDMAMailboxIdle;
+        I3C_MasterSmartDMAStopDataPhase(base, handle);
+        return false;
+    }
+
+    return fifoReady != 0U;
 }
 
 static void I3C_MasterSmartDMASetTxTriggerLevel(I3C_Type *base, i3c_tx_trigger_level_t txLevel)
@@ -194,14 +196,25 @@ void EZH_Callback(void *param)
     i3c_master_smartdma_handle_t *i3cHandle = (i3c_master_smartdma_handle_t *)param;
     uint32_t instance;
 
+    if (i3cHandle->smartdmaMailbox == (uint32_t)kSmartDMAMailboxProtocol)
+    {
+        I3C_MasterTransferSmartDMAHandleIRQ(i3cHandle->base, i3cHandle);
+        return;
+    }
+
+    i3cHandle->smartdmaMailbox = (uint32_t)kSmartDMAMailboxIdle;
+
     I3C_MasterSmartDMAExitDataPhase(i3cHandle->base, i3cHandle);
 
     if (i3cHandle->transfer.direction == kI3C_Read)
     {
         /* Disable I3C Rx DMA. */
         i3cHandle->base->MDMACTRL &= ~I3C_MDMACTRL_DMAFB_MASK;
-        /* Terminate following data if present. */
-        i3cHandle->base->MCTRL |= I3C_MCTRL_RDTERM(1U);
+        if (i3cHandle->transfer.dataSize == 1U)
+        {
+            /* Single-byte reads do not pass through the EZH loop that arms RDTERM. */
+            i3cHandle->base->MCTRL |= I3C_MCTRL_RDTERM(1U);
+        }
         i3cHandle->smartdmaReadTailPending = true;
     }
     else if (i3cHandle->transfer.direction == kI3C_Write)
@@ -274,6 +287,7 @@ static status_t I3C_MasterCompleteSmartDMAReadTail(i3c_master_smartdma_handle_t 
     }
 
     ((uint8_t *)handle->transfer.data)[handle->transfer.dataSize - 1U] = (uint8_t)handle->base->MRDATAB;
+
     handle->smartdmaReadTailPending = false;
     return kStatus_Success;
 }
@@ -292,12 +306,14 @@ static void I3C_MasterRunSmartDMATransfer(
     handle->smartdmaCompletionPending = true;
     handle->smartdmaReadTailPending = false;
     handle->dataIrqMask = 0U;
-    handle->cpuIrqMasked = false;
+    handle->smartdmaDataWindowActive = false;
     handle->txTriggerAdjusted = false;
+    handle->smartdmaMailbox = (uint32_t)kSmartDMAMailboxIdle;
     handle->smartdmaParam.addr = (uint32_t *)data;
     handle->smartdmaParam.dataSize = dataSize;
     handle->smartdmaParam.i3cBaseAddress = (uint32_t *)(uintptr_t)base;
     handle->smartdmaParam.slave_address = handle->transfer.slaveAddress;
+    handle->smartdmaParam.mailbox = &handle->smartdmaMailbox;
 
     SMARTDMA_Reset();
 
@@ -332,12 +348,12 @@ static void I3C_MasterRunSmartDMATransfer(
 
     if (direction == kI3C_Write)
     {
-        /* Writes enter the masked data window immediately because data phase starts as soon as SmartDMA boots. */
+        /* Writes enter the SmartDMA-owned FIFO pacing window immediately. */
         I3C_MasterSmartDMAEnterDataPhase(base, handle, dataIrqMask);
     }
     else
     {
-        /* Reads defer the masked window until the repeated-start receive phase is active. */
+        /* Reads defer the FIFO pacing window until the repeated-start receive phase is active. */
         handle->dataIrqMask = dataIrqMask;
     }
 
@@ -440,6 +456,7 @@ static status_t I3C_MasterInitTransferStateMachineSmartDMA(I3C_Type *base, i3c_m
         if ((handle->transfer.direction == kI3C_Read) && (xfer->subaddressSize == 0U))
         {
             I3C_MasterRunSmartDMATransfer(base, handle, xfer->data, xfer->dataSize, kI3C_Read);
+            I3C_MasterSmartDMAEnterDataPhase(base, handle, handle->dataIrqMask);
         }
 
         if (handle->state != (uint8_t)kStopState)
@@ -505,6 +522,7 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
     }
 
     if ((handle->state == (uint8_t)kWaitForCompletionState) && handle->smartdmaCompletionPending &&
+        handle->smartdmaDataWindowActive &&
         (statusToHandle == 0U) && (errStatus == 0U))
     {
         return result;
@@ -642,6 +660,7 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
                 {
                     handle->state = (uint8_t)kReceiveDataState;
                     I3C_MasterRunSmartDMATransfer(base, handle, xfer->data, xfer->dataSize, kI3C_Read);
+                    I3C_MasterSmartDMAEnterDataPhase(base, handle, handle->dataIrqMask);
                     result = I3C_MasterRepeatedStart(base, xfer->busType, xfer->slaveAddress, kI3C_Read);
                 }
 
@@ -655,9 +674,10 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
                 break;
 
             case (uint8_t)kReceiveDataState:
-                if ((handle->transfer.direction == kI3C_Read) && !handle->cpuIrqMasked && (handle->dataIrqMask != 0U))
+                if ((handle->transfer.direction == kI3C_Read) && !handle->smartdmaDataWindowActive &&
+                    (handle->dataIrqMask != 0U))
                 {
-                    /* The receive data window starts only after repeated start completes, so mask CM33 here. */
+                    /* The receive data window starts only after repeated start completes. */
                     I3C_MasterSmartDMAEnterDataPhase(base, handle, handle->dataIrqMask);
                 }
                 handle->state = (uint8_t)kWaitForCompletionState;
@@ -786,8 +806,15 @@ void I3C_MasterTransferSmartDMAHandleIRQ(I3C_Type *base, void *i3cHandle)
     i3c_master_smartdma_handle_t *handle = (i3c_master_smartdma_handle_t *)i3cHandle;
     status_t result;
     bool isDone;
+    uint32_t pendingInterrupts;
 
     if (NULL == handle)
+    {
+        return;
+    }
+
+    pendingInterrupts = I3C_MasterGetPendingInterrupts(base);
+    if (I3C_MasterSmartDMAHandleActiveDataWindowIRQ(base, handle, pendingInterrupts))
     {
         return;
     }
@@ -801,7 +828,8 @@ void I3C_MasterTransferSmartDMAHandleIRQ(I3C_Type *base, void *i3cHandle)
     }
 
     /* The I3C completion IRQ can arrive before SmartDMA has handled the tail byte. */
-    if (isDone && (result == kStatus_Success) && handle->smartdmaCompletionPending)
+    if (isDone && (result == kStatus_Success) && handle->smartdmaCompletionPending &&
+        handle->smartdmaDataWindowActive)
     {
         return;
     }

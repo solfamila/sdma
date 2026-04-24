@@ -30,6 +30,7 @@ typedef struct _smartdma_transfer_param
     uint32_t dataSize;
     uint32_t *i3cBaseAddress;
     uint32_t slave_address;
+    volatile uint32_t *mailbox;
 } smartdma_transfer_param_t;
 
 /* Forward declaration of the transfer descriptor and handle typedefs. */
@@ -62,9 +63,10 @@ struct _i3c_master_smartdma_handle
     uint32_t dataIrqMask;                   /*!< FIFO-ready IRQ source temporarily handed to SmartDMA. */
     bool smartdmaCompletionPending;         /*!< Tail-byte SmartDMA completion has not run yet. */
     bool smartdmaReadTailPending;           /*!< The final read byte still needs to be drained from the FIFO. */
-    bool cpuIrqMasked;                      /*!< Legacy flag for CM33-side NVIC masking during SmartDMA data phase. */
+    bool smartdmaDataWindowActive;          /*!< SmartDMA currently owns the FIFO-ready pacing source. */
     bool txTriggerAdjusted;                 /*!< Write-side TX watermark is temporarily overridden for SmartDMA pacing. */
     uint8_t savedTxTriggerLevel;            /*!< Original TX watermark restored when the SmartDMA data phase ends. */
+    volatile uint32_t smartdmaMailbox;      /*!< SmartDMA-to-CM33 handoff reason written by the EZH program. */
     uint8_t subaddressBuffer[4];            /*!< Saving subaddress command. */
     uint8_t subaddressCount;                /*!< Saving command count. */
     i3c_master_transfer_t transfer;         /*!< Copy of the current transfer info. */
