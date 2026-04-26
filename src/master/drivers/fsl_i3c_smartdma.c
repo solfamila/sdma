@@ -240,6 +240,18 @@ void EZH_Callback(void *param)
         {
         }
         i3cHandle->base->MWDATABE = i3cEndByte[instance];
+
+#if defined(EXPERIMENT_MASTER_SMARTDMA_TAIL_WAIT)
+        {
+            uint32_t waitCount = 0U;
+
+            while (((I3C_MasterGetStatusFlags(i3cHandle->base) & (uint32_t)kI3C_MasterCompleteFlag) == 0U) &&
+                   (waitCount < 1000000U))
+            {
+                waitCount++;
+            }
+        }
+#endif
     }
 
     i3cHandle->smartdmaCompletionPending = false;
@@ -477,7 +489,6 @@ static status_t I3C_MasterInitTransferStateMachineSmartDMA(I3C_Type *base, i3c_m
         if ((handle->transfer.direction == kI3C_Read) && (xfer->subaddressSize == 0U))
         {
             I3C_MasterRunSmartDMATransfer(base, handle, xfer->data, xfer->dataSize, kI3C_Read);
-            I3C_MasterSmartDMAEnterDataPhase(base, handle, handle->dataIrqMask);
         }
 
         if (handle->state != (uint8_t)kStopState)
@@ -681,7 +692,6 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
                 {
                     handle->state = (uint8_t)kReceiveDataState;
                     I3C_MasterRunSmartDMATransfer(base, handle, xfer->data, xfer->dataSize, kI3C_Read);
-                    I3C_MasterSmartDMAEnterDataPhase(base, handle, handle->dataIrqMask);
                     result = I3C_MasterRepeatedStart(base, xfer->busType, xfer->slaveAddress, kI3C_Read);
                 }
 
@@ -855,12 +865,32 @@ void I3C_MasterTransferSmartDMAHandleIRQ(I3C_Type *base, void *i3cHandle)
         return;
     }
 
+    /*
+     * On read transfers the protocol-side NAK can be observed before EZH has
+     * returned and armed the deferred tail handling. Do not finalize the
+     * transfer on that first NAK while SmartDMA completion is still pending.
+     */
+    if ((result == kStatus_I3C_Nak) && handle->smartdmaCompletionPending &&
+        !handle->smartdmaReadTailPending && (handle->transfer.direction == kI3C_Read))
+    {
+        handle->smartdmaCompletionStatus = kStatus_I3C_Nak;
+        return;
+    }
+
     if (isDone && (result == kStatus_Success) && handle->smartdmaReadTailPending)
     {
         result = I3C_MasterCompleteSmartDMAReadTail(handle);
     }
 
-    if (handle->state == (uint8_t)kIdleState)
+    if ((result == kStatus_I3C_Nak) && handle->smartdmaReadTailPending &&
+        (handle->smartdmaCompletionStatus == kStatus_Success))
+    {
+        result = I3C_MasterCompleteSmartDMAReadTail(handle);
+        isDone = true;
+    }
+
+    if ((handle->state == (uint8_t)kIdleState) && !isDone && (result == kStatus_Success) &&
+        !handle->smartdmaReadTailPending)
     {
         return;
     }
