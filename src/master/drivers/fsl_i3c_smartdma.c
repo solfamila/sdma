@@ -97,6 +97,8 @@ static void I3C_MasterSmartDMAStopDataPhase(I3C_Type *base, i3c_master_smartdma_
 static void I3C_MasterSmartDMAEnterDataPhase(
     I3C_Type *base, i3c_master_smartdma_handle_t *handle, uint32_t dataIrqMask);
 
+static void I3C_MasterSmartDMABootstrapReadDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle);
+
 static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle);
 
 static bool I3C_MasterSmartDMAHandleActiveDataWindowIRQ(
@@ -106,6 +108,8 @@ static void I3C_MasterSmartDMASetTxTriggerLevel(I3C_Type *base, i3c_tx_trigger_l
 
 static void I3C_MasterRunSmartDMATransfer(
     I3C_Type *base, i3c_master_smartdma_handle_t *handle, void *data, size_t dataSize, i3c_direction_t direction);
+
+static uint8_t I3C_MasterSmartDMAGetReadTerminateSize(const i3c_master_transfer_t *xfer, i3c_direction_t direction);
 
 static status_t I3C_MasterInitTransferStateMachineSmartDMA(I3C_Type *base,
                                                            i3c_master_smartdma_handle_t *handle);
@@ -154,6 +158,16 @@ static void I3C_MasterSmartDMAEnterDataPhase(
     I3C_MasterDisableInterrupts(base, dataIrqMask);
 }
 
+static void I3C_MasterSmartDMABootstrapReadDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle)
+{
+    if ((handle->transfer.direction == kI3C_Read) && (handle->state == (uint8_t)kReceiveDataState) &&
+        !handle->smartdmaDataWindowActive && (handle->dataIrqMask != 0U))
+    {
+        I3C_MasterSmartDMAEnterDataPhase(base, handle, handle->dataIrqMask);
+        handle->state = (uint8_t)kWaitForCompletionState;
+    }
+}
+
 static void I3C_MasterSmartDMAExitDataPhase(I3C_Type *base, i3c_master_smartdma_handle_t *handle)
 {
     I3C_MasterSmartDMAStopDataPhase(base, handle);
@@ -180,6 +194,12 @@ static bool I3C_MasterSmartDMAHandleActiveDataWindowIRQ(
     if ((handle->smartdmaMailbox == (uint32_t)kSmartDMAMailboxProtocol) || (protocol != 0U))
     {
         handle->smartdmaProtocolBounceCount++;
+        if (handle->smartdmaBounceStatus == 0U)
+        {
+            handle->smartdmaBounceStatus = base->MSTATUS;
+            handle->smartdmaBounceErrStatus = base->MERRWARN;
+            handle->smartdmaBounceDataCtrl = base->MDATACTRL;
+        }
         if (handle->smartdmaMailbox == (uint32_t)kSmartDMAMailboxProtocol)
         {
             handle->smartdmaMailboxProtocolCount++;
@@ -212,6 +232,10 @@ void EZH_Callback(void *param)
 
     if (i3cHandle->smartdmaMailbox == (uint32_t)kSmartDMAMailboxProtocol)
     {
+        i3cHandle->smartdmaMailboxMaskedStatus = i3cHandle->base->MINTMASKED;
+        i3cHandle->smartdmaMailboxStatus = i3cHandle->base->MSTATUS;
+        i3cHandle->smartdmaMailboxErrStatus = i3cHandle->base->MERRWARN;
+        i3cHandle->smartdmaMailboxDataCtrl = i3cHandle->base->MDATACTRL;
         I3C_MasterTransferSmartDMAHandleIRQ(i3cHandle->base, i3cHandle);
         return;
     }
@@ -342,6 +366,13 @@ static void I3C_MasterRunSmartDMATransfer(
     handle->smartdmaWindowPendingMask = 0U;
     handle->smartdmaWindowFifoMask = 0U;
     handle->smartdmaWindowProtocolMask = 0U;
+    handle->smartdmaBounceStatus = 0U;
+    handle->smartdmaBounceErrStatus = 0U;
+    handle->smartdmaBounceDataCtrl = 0U;
+    handle->smartdmaMailboxMaskedStatus = 0U;
+    handle->smartdmaMailboxStatus = 0U;
+    handle->smartdmaMailboxErrStatus = 0U;
+    handle->smartdmaMailboxDataCtrl = 0U;
     handle->smartdmaParam.addr = (uint32_t *)data;
     handle->smartdmaParam.dataSize = dataSize;
     handle->smartdmaParam.i3cBaseAddress = (uint32_t *)(uintptr_t)base;
@@ -402,16 +433,30 @@ static void I3C_MasterRunSmartDMATransfer(
     I3C_MasterEnableDMA(base, isEnableTxDMA, isEnableRxDMA, width);
 }
 
+static uint8_t I3C_MasterSmartDMAGetReadTerminateSize(const i3c_master_transfer_t *xfer, i3c_direction_t direction)
+{
+    if ((direction == kI3C_Read) && ((xfer->flags & (uint32_t)kI3C_TransferDisableRxTermFlag) == 0U) &&
+        (xfer->dataSize <= 255U))
+    {
+        return (uint8_t)xfer->dataSize;
+    }
+
+    return 0U;
+}
+
 static status_t I3C_MasterInitTransferStateMachineSmartDMA(I3C_Type *base, i3c_master_smartdma_handle_t *handle)
 {
     i3c_master_transfer_t *xfer = &handle->transfer;
     status_t result = kStatus_Success;
     i3c_direction_t direction = xfer->direction;
+    uint8_t readTerminateSize;
 
     if (xfer->busType != kI3C_TypeI3CDdr)
     {
         direction = (0UL != xfer->subaddressSize) ? kI3C_Write : xfer->direction;
     }
+
+    readTerminateSize = I3C_MasterSmartDMAGetReadTerminateSize(xfer, direction);
 
     handle->subaddressCount = 0U;
     if (xfer->subaddressSize != 0U)
@@ -495,17 +540,21 @@ static status_t I3C_MasterInitTransferStateMachineSmartDMA(I3C_Type *base, i3c_m
         {
             if (0U != (xfer->flags & (uint32_t)kI3C_TransferRepeatedStartFlag))
             {
-                result = I3C_MasterRepeatedStart(base, xfer->busType, xfer->slaveAddress, direction);
+                result = I3C_MasterRepeatedStartWithRxSize(base, xfer->busType, xfer->slaveAddress, direction,
+                                                           readTerminateSize);
             }
             else
             {
-                result = I3C_MasterStart(base, xfer->busType, xfer->slaveAddress, direction);
+                result = I3C_MasterStartWithRxSize(base, xfer->busType, xfer->slaveAddress, direction,
+                                                  readTerminateSize);
             }
 
             if (result != kStatus_Success)
             {
                 return result;
             }
+
+            I3C_MasterSmartDMABootstrapReadDataPhase(base, handle);
         }
     }
 
@@ -692,7 +741,13 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
                 {
                     handle->state = (uint8_t)kReceiveDataState;
                     I3C_MasterRunSmartDMATransfer(base, handle, xfer->data, xfer->dataSize, kI3C_Read);
-                    result = I3C_MasterRepeatedStart(base, xfer->busType, xfer->slaveAddress, kI3C_Read);
+                    result = I3C_MasterRepeatedStartWithRxSize(base, xfer->busType, xfer->slaveAddress, kI3C_Read,
+                                                               I3C_MasterSmartDMAGetReadTerminateSize(xfer,
+                                                                                                      kI3C_Read));
+                    if (result == kStatus_Success)
+                    {
+                        I3C_MasterSmartDMABootstrapReadDataPhase(base, handle);
+                    }
                 }
 
                 state_complete = true;
@@ -874,7 +929,17 @@ void I3C_MasterTransferSmartDMAHandleIRQ(I3C_Type *base, void *i3cHandle)
         !handle->smartdmaReadTailPending && (handle->transfer.direction == kI3C_Read))
     {
         handle->smartdmaCompletionStatus = kStatus_I3C_Nak;
-        return;
+
+        /* Once the SmartDMA data window has already closed, there is no later
+         * EZH completion edge left to retire this read-side NAK. Finalize it
+         * now instead of leaving the transfer stuck in WaitForCompletion.
+         */
+        if (handle->smartdmaDataWindowActive)
+        {
+            return;
+        }
+
+        isDone = true;
     }
 
     if (isDone && (result == kStatus_Success) && handle->smartdmaReadTailPending)

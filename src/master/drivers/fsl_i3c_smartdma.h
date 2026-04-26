@@ -74,6 +74,13 @@ struct _i3c_master_smartdma_handle
     uint32_t smartdmaWindowPendingMask;     /*!< OR'd pending interrupt mask observed during the SmartDMA data window. */
     uint32_t smartdmaWindowFifoMask;        /*!< OR'd FIFO-ready bits observed during the SmartDMA data window. */
     uint32_t smartdmaWindowProtocolMask;    /*!< OR'd protocol/escalation bits observed during the SmartDMA data window. */
+    uint32_t smartdmaBounceStatus;          /*!< MSTATUS captured on the first active-window protocol bounce. */
+    uint32_t smartdmaBounceErrStatus;       /*!< MERRWARN captured on the first active-window protocol bounce. */
+    uint32_t smartdmaBounceDataCtrl;        /*!< MDATACTRL captured on the first active-window protocol bounce. */
+    uint32_t smartdmaMailboxMaskedStatus;   /*!< MINTMASKED captured when EZH escalates with mailbox=protocol. */
+    uint32_t smartdmaMailboxStatus;         /*!< MSTATUS captured when EZH escalates with mailbox=protocol. */
+    uint32_t smartdmaMailboxErrStatus;      /*!< MERRWARN captured when EZH escalates with mailbox=protocol. */
+    uint32_t smartdmaMailboxDataCtrl;       /*!< MDATACTRL captured when EZH escalates with mailbox=protocol. */
     uint8_t subaddressBuffer[4];            /*!< Saving subaddress command. */
     uint8_t subaddressCount;                /*!< Saving command count. */
     i3c_master_transfer_t transfer;         /*!< Copy of the current transfer info. */

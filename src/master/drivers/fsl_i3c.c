@@ -3437,6 +3437,23 @@ static void I3C_SlaveTransferHandleBusStop(I3C_Type *base,
                                            i3c_slave_handleIrq_param_t *stateParams)
 {
     assert(NULL != base && NULL != handle && NULL != stateParams);
+
+#if defined(EXPERIMENT_SLAVE_DRAIN_RX_ON_STOP)
+    if (!handle->wasTransmit)
+    {
+        size_t lateRxCount = 0U;
+
+        I3C_SlaveGetFifoCounts(base, &lateRxCount, NULL);
+        while ((lateRxCount != 0U) && (handle->transfer.rxData != NULL) && (handle->transfer.rxDataSize != 0UL))
+        {
+            *(handle->transfer.rxData++) = (uint8_t)(base->SRDATAB & 0xFFU);
+            --(handle->transfer.rxDataSize);
+            ++(handle->transferredCount);
+            --lateRxCount;
+        }
+    }
+#endif
+
     I3C_SlaveDisableInterrupts(base, (uint32_t)kI3C_SlaveTxReadyFlag);
     stateParams->pendingInts &= ~(uint32_t)kI3C_SlaveTxReadyFlag;
     base->SDATACTRL |= I3C_SDATACTRL_FLUSHTB_MASK | I3C_SDATACTRL_FLUSHFB_MASK;
