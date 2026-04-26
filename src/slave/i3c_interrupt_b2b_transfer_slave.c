@@ -133,13 +133,17 @@ static void semihost_write0(const char *message)
 
 /*For MASTER DMA TX TEST*/
 //#define I3C_MASTER_DMA_TX_TEST
+#ifndef I3C_SLAVE_RX_DATA_LENGTH
 #define I3C_SLAVE_RX_DATA_LENGTH            255U
+#endif
 
 
 
 ///*For MASTER DMA RX TEST*/
 #define I3C_MASTER_DMA_RX_TEST
+#ifndef I3C_SLAVE_TX_DATA_LENGTH
 #define I3C_SLAVE_TX_DATA_LENGTH            255U
+#endif
 
 
 /*******************************************************************************
@@ -375,10 +379,19 @@ static void i3c_slave_callback(I3C_Type *base, i3c_slave_transfer_t *xfer, void 
             {
                 if (g_lastTransferWasReceive)
                 {
+                    uint32_t echoedCount = (uint32_t)xfer->transferredCount;
+
+#if defined(EXPERIMENT_SLAVE_ECHO_COUNT_PLUS_ONE)
+                    if (echoedCount < I3C_SLAVE_RX_DATA_LENGTH)
+                    {
+                        echoedCount++;
+                    }
+#endif
+
                     i3c_slave_record_trace(
                         kSlaveTraceRxComplete, g_slave_rxBuff, (uint32_t)xfer->transferredCount, 0U);
                     g_txBuff = g_slave_rxBuff;
-                    g_txSize = (uint32_t)xfer->transferredCount;
+                    g_txSize = echoedCount;
                     i3c_slave_record_trace(kSlaveTraceEchoArmed, g_txBuff, g_txSize, 0U);
                 }
                 else

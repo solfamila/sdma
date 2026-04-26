@@ -69,3 +69,11 @@ src/master/scripts/flash_rt595.sh slave-flash
 ```
 
 Those scripts are now thin Bazel wrappers. There is no separate manual-build path anymore.
+
+## TRACE32 Analyzer Debugging
+
+The current Lauterbach workflow for `master_interrupt` is documented in
+`src/master/doc/trace32_analyzer_debugging.md`.
+
+Use that flow when you need a bounded off-chip Analyzer trace through the MCP
+server instead of a full free-running dump.
