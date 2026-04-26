@@ -553,8 +553,6 @@ static status_t I3C_MasterInitTransferStateMachineSmartDMA(I3C_Type *base, i3c_m
             {
                 return result;
             }
-
-            I3C_MasterSmartDMABootstrapReadDataPhase(base, handle);
         }
     }
 
@@ -744,10 +742,6 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
                     result = I3C_MasterRepeatedStartWithRxSize(base, xfer->busType, xfer->slaveAddress, kI3C_Read,
                                                                I3C_MasterSmartDMAGetReadTerminateSize(xfer,
                                                                                                       kI3C_Read));
-                    if (result == kStatus_Success)
-                    {
-                        I3C_MasterSmartDMABootstrapReadDataPhase(base, handle);
-                    }
                 }
 
                 state_complete = true;
