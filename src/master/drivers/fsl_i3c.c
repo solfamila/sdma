@@ -1513,7 +1513,21 @@ status_t I3C_MasterReceive(I3C_Type *base, void *rxBuff, size_t rxSize, uint32_t
             return kStatus_I3C_Timeout;
         }
 #endif
-        /* Check for errors. */
+        /* Check RX data */
+        if ((0UL != rxSize) && (0UL != (base->MDATACTRL & I3C_MDATACTRL_RXCOUNT_MASK)))
+        {
+            *buf++ = (uint8_t)(base->MRDATAB & I3C_MRDATAB_VALUE_MASK);
+            rxSize--;
+            if ((flags & (uint32_t)kI3C_TransferDisableRxTermFlag) == 0UL)
+            {
+                if ((!isRxAutoTerm) && (rxSize == 1U))
+                {
+                    base->MCTRL |= I3C_MCTRL_RDTERM(1U);
+                }
+            }
+        }
+
+        /* Check for errors after draining any already-present RX bytes. */
         result = I3C_MasterCheckAndClearError(base, I3C_MasterGetErrorStatusFlags(base));
         if (kStatus_Success != result)
         {
@@ -1545,20 +1559,6 @@ status_t I3C_MasterReceive(I3C_Type *base, void *rxBuff, size_t rxSize, uint32_t
                     {
                         return result;
                     }
-                }
-            }
-        }
-
-        /* Check RX data */
-        if ((0UL != rxSize) && (0UL != (base->MDATACTRL & I3C_MDATACTRL_RXCOUNT_MASK)))
-        {
-            *buf++ = (uint8_t)(base->MRDATAB & I3C_MRDATAB_VALUE_MASK);
-            rxSize--;
-            if ((flags & (uint32_t)kI3C_TransferDisableRxTermFlag) == 0UL)
-            {
-                if ((!isRxAutoTerm) && (rxSize == 1U))
-                {
-                    base->MCTRL |= I3C_MCTRL_RDTERM(1U);
                 }
             }
         }
