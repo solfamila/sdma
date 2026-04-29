@@ -59,6 +59,7 @@ struct _i3c_master_smartdma_handle
     I3C_Type *base;                         /*!< I3C base pointer. */
     uint8_t state;                          /*!< Transfer state machine current state. */
     uint32_t transferCount;                 /*!< Indicates progress of the transfer */
+    uint32_t smartdmaConfiguredDataSize;    /*!< SmartDMA byte count programmed for the current transfer. */
     status_t smartdmaCompletionStatus;      /*!< Status reported by the SmartDMA completion callback. */
     uint32_t dataIrqMask;                   /*!< FIFO-ready IRQ source temporarily handed to SmartDMA. */
     bool smartdmaCompletionPending;         /*!< Tail-byte SmartDMA completion has not run yet. */
@@ -67,6 +68,8 @@ struct _i3c_master_smartdma_handle
     bool txTriggerAdjusted;                 /*!< Write-side TX watermark is temporarily overridden for SmartDMA pacing. */
     uint8_t savedTxTriggerLevel;            /*!< Original TX watermark restored when the SmartDMA data phase ends. */
     volatile uint32_t smartdmaMailbox;      /*!< SmartDMA-to-CM33 handoff reason written by the EZH program. */
+    uint32_t smartdmaCompletionCallbackCount; /*!< Number of normal EZH completion callbacks seen for current transfer. */
+    uint32_t smartdmaReadTailCompleteCount; /*!< Number of deferred CM33 read-tail drains completed. */
     uint32_t smartdmaWindowIrqCount;        /*!< CM33 IRQ entries observed while the SmartDMA data window was active. */
     uint32_t smartdmaFifoReadyBounceCount;  /*!< Active-window IRQs treated as FIFO-ready fast returns. */
     uint32_t smartdmaProtocolBounceCount;   /*!< Active-window IRQs escalated back into the CM33 state machine. */

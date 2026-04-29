@@ -240,6 +240,7 @@ void EZH_Callback(void *param)
         return;
     }
 
+    i3cHandle->smartdmaCompletionCallbackCount++;
     i3cHandle->smartdmaMailbox = (uint32_t)kSmartDMAMailboxIdle;
 
     I3C_MasterSmartDMAExitDataPhase(i3cHandle->base, i3cHandle);
@@ -254,6 +255,7 @@ void EZH_Callback(void *param)
             i3cHandle->base->MCTRL |= I3C_MCTRL_RDTERM(1U);
         }
         i3cHandle->smartdmaReadTailPending = true;
+        I3C_MasterEnableInterrupts(i3cHandle->base, (uint32_t)kI3C_MasterRxReadyFlag);
     }
     else if (i3cHandle->transfer.direction == kI3C_Write)
     {
@@ -338,7 +340,9 @@ static status_t I3C_MasterCompleteSmartDMAReadTail(i3c_master_smartdma_handle_t 
 
     ((uint8_t *)handle->transfer.data)[handle->transfer.dataSize - 1U] = (uint8_t)handle->base->MRDATAB;
 
+    handle->smartdmaReadTailCompleteCount++;
     handle->smartdmaReadTailPending = false;
+    I3C_MasterDisableInterrupts(handle->base, (uint32_t)kI3C_MasterRxReadyFlag);
     return kStatus_Success;
 }
 
@@ -352,6 +356,7 @@ static void I3C_MasterRunSmartDMATransfer(
     uint32_t instance;
 
     handle->transferCount = dataSize;
+    handle->smartdmaConfiguredDataSize = 0U;
     handle->smartdmaCompletionStatus = kStatus_Success;
     handle->smartdmaCompletionPending = true;
     handle->smartdmaReadTailPending = false;
@@ -359,6 +364,8 @@ static void I3C_MasterRunSmartDMATransfer(
     handle->smartdmaDataWindowActive = false;
     handle->txTriggerAdjusted = false;
     handle->smartdmaMailbox = (uint32_t)kSmartDMAMailboxIdle;
+    handle->smartdmaCompletionCallbackCount = 0U;
+    handle->smartdmaReadTailCompleteCount = 0U;
     handle->smartdmaWindowIrqCount = 0U;
     handle->smartdmaFifoReadyBounceCount = 0U;
     handle->smartdmaProtocolBounceCount = 0U;
@@ -400,6 +407,7 @@ static void I3C_MasterRunSmartDMATransfer(
             handle->smartdmaParam.dataSize = 0U;
             i3cEndByte[instance] = ((uint8_t *)data)[0];
         }
+        handle->smartdmaConfiguredDataSize = handle->smartdmaParam.dataSize;
         isEnableTxDMA = true;
     }
     else
@@ -407,6 +415,7 @@ static void I3C_MasterRunSmartDMATransfer(
         dataIrqMask = (uint32_t)kI3C_MasterRxReadyFlag;
         dataSize--;
         handle->smartdmaParam.dataSize = dataSize;
+        handle->smartdmaConfiguredDataSize = handle->smartdmaParam.dataSize;
         isEnableRxDMA = true;
     }
 
@@ -765,6 +774,17 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
                 break;
 
             case (uint8_t)kWaitForCompletionState:
+                if (handle->smartdmaReadTailPending && (0UL != (status & (uint32_t)kI3C_MasterRxReadyFlag)))
+                {
+                    result = I3C_MasterCompleteSmartDMAReadTail(handle);
+                    if (result != kStatus_Success)
+                    {
+                        return result;
+                    }
+                    handle->state = (uint8_t)kStopState;
+                    break;
+                }
+
                 if (0UL != (statusToHandle & (uint32_t)kI3C_MasterCompleteFlag))
                 {
                     handle->state = (uint8_t)kStopState;
