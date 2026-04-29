@@ -3,6 +3,8 @@
 .venv/
 .venv-pyocd/
 .local/
+.worktrees/
+standalone_i3c_experiments_pass_64939fe/
 bazel-*
 .bazel-*
 bazel-bin/
