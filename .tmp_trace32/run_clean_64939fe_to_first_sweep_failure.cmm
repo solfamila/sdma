@@ -1,0 +1,30 @@
+RESet
+SYStem.RESet
+SYStem.CPU IMXRT595-CM33
+IF COMBIPROBE()||UTRACE()
+(
+  SYStem.CONFIG.CONNECTOR MIPI20T
+)
+SYStem.Option DUALPORT ON
+SYStem.MemAccess DAP
+SYStem.JtagClock 10MHz
+ETM.OFF
+ITM.OFF
+SYStem.Up
+
+Data.LOAD.Elf "/Users/foxy/Downloads/tts/standalone_i3c_experiments_pass_64939fe/master_i3c_sdma_seed_tail_len_sweep/_build/master/evkmimxrt595_ezhb.axf"
+
+Break.Delete
+Break.Set capture_chunk_validate_failure /Program
+Break.Set capture_failure_snapshot /Program
+Break.Set set_failure_led /Program
+Break.Set set_success_led /Program
+
+Go
+WAIT !STATE.RUN() 30.s
+IF STATE.RUN()
+(
+  Break
+  WAIT !STATE.RUN() 1.s
+)
+ENDDO

@@ -1,0 +1,8 @@
+Go
+WAIT !STATE.RUN() 150.s
+IF STATE.RUN()
+(
+  Break
+  WAIT !STATE.RUN() 1.s
+)
+ENDDO

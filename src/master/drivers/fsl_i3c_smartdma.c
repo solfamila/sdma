@@ -186,6 +186,10 @@ static bool I3C_MasterSmartDMAHandleActiveDataWindowIRQ(
 
     fifoReady = pendingInterrupts & (uint32_t)kMasterFifoReadyFlags;
     protocol = pendingInterrupts & (uint32_t)kMasterProtocolBounceFlags;
+    if (handle->smartdmaCompletionPending && ((pendingInterrupts & (uint32_t)kI3C_MasterCompleteFlag) != 0U))
+    {
+        protocol |= (uint32_t)kI3C_MasterCompleteFlag;
+    }
     handle->smartdmaWindowIrqCount++;
     handle->smartdmaWindowPendingMask |= pendingInterrupts;
     handle->smartdmaWindowFifoMask |= fifoReady;
@@ -804,8 +808,11 @@ static status_t I3C_MasterRunTransferStateMachineSmartDMA(I3C_Type *base,
                     }
                     else
                     {
+                        /* Match the plain transactional driver: emit STOP and
+                         * let the controller finish it asynchronously instead
+                         * of busy-waiting for MCTRLDONE from the IRQ path.
+                         */
                         I3C_MasterEmitRequest(base, kI3C_RequestEmitStop);
-                        result = I3C_MasterWaitForCtrlDone(base, false);
                     }
                 }
 
