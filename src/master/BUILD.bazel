@@ -1,7 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("@pigweed//pw_build:binary_tools.bzl", "pw_pad_binary")
 load("@pigweed//pw_build:pw_linker_script.bzl", "pw_linker_script")
-load("//tools/bazel:rt595_defs.bzl", "RT595_COMMON_COPTS", "RT595_COMMON_DEFINES", "RT595_LINKOPTS", "RT595_MASTER_COPTS", "RT595_MASTER_INCLUDES", "RT595_PIGWEED_DEFINES")
+load("//tools/bazel:rt595_defs.bzl", "RT595_COMMON_COPTS", "RT595_COMMON_DEFINES", "RT595_LINKOPTS", "RT595_MASTER_COPTS", "RT595_MASTER_INCLUDES", "RT595_PIGWEED_DEFINES", "RT595_TARGET_COMPATIBLE_WITH")
 load("//tools/bazel:transition.bzl", "mimxrt595_binary", "mimxrt595_fastboot_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -48,6 +48,7 @@ cc_library(
     includes = RT595_MASTER_INCLUDES,
     copts = RT595_MASTER_COPTS,
     defines = RT595_COMMON_DEFINES,
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -92,6 +93,7 @@ cc_library(
     includes = RT595_MASTER_INCLUDES,
     copts = RT595_MASTER_COPTS,
     defines = RT595_COMMON_DEFINES,
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -107,6 +109,7 @@ cc_library(
     defines = RT595_COMMON_DEFINES,
     includes = RT595_MASTER_INCLUDES,
     deps = [":rt595_sdk_core"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -123,6 +126,7 @@ cc_library(
         ":rt595_board_support",
         ":rt595_sdk_core",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -130,6 +134,7 @@ cc_library(
     name = "pw_log_backend_headers",
     hdrs = ["pigweed_overrides/pw_log_backend/log_backend.h"],
     strip_include_prefix = "pigweed_overrides",
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     deps = ["@pigweed//pw_preprocessor"],
 )
 
@@ -147,6 +152,7 @@ cc_library(
         "@pigweed//pw_log:facade",
         "@pigweed//pw_preprocessor",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -155,6 +161,7 @@ cc_library(
     defines = [
         "PW_THREAD_FREERTOS_CONFIG_DEFAULT_STACK_SIZE_WORDS=2048",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -162,6 +169,7 @@ cc_library(
     defines = [
         "PW_FUNCTION_ENABLE_DYNAMIC_ALLOCATION=1",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -174,6 +182,7 @@ cc_library(
     deps = [
         "@pigweed//third_party/freertos:support",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -189,6 +198,7 @@ cc_library(
         "FASTBOOT_APP_SIZE=(FASTBOOT_FLASH_SIZE-FASTBOOT_APP_VECTOR_TABLE)",
         "FASTBOOT_BOOT_DATA_BASE=0x20007F00",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -216,6 +226,7 @@ cc_library(
     deps = [
         ":rt595_sdk_core_no_startup",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -237,6 +248,7 @@ cc_library(
         "@mcuxpresso//:middleware.usb.device_controller_ip3511hs.MIMXRT595S",
         "@mcuxpresso//:middleware.usb.phy.MIMXRT595S",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -273,6 +285,7 @@ cc_library(
         ":mcuxpresso_sdk_fastboot",
         "@pigweed//third_party/freertos:support",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -293,6 +306,7 @@ cc_library(
         "@pigweed//pw_fastboot",
         "@pigweed//pw_fastboot_usb",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -311,6 +325,7 @@ cc_library(
     deps = [
         ":fastboot_defines",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 pw_linker_script(
@@ -342,6 +357,7 @@ cc_library(
         "@pigweed//pw_sys_io_mcuxpresso",
         "@pigweed//third_party/freertos:support",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -354,6 +370,7 @@ cc_library(
         "@pigweed//pw_tokenizer:linker_script",
         "@pigweed//pw_toolchain:wrap_abort",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -378,6 +395,7 @@ cc_library(
         "@pigweed//third_party/freertos:support",
         "@pigweed//third_party/aosp:libsparse",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_library(
@@ -392,6 +410,7 @@ cc_library(
         ":rt595_master_runtime",
         "@pigweed//pw_log:facade",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 cc_binary(
@@ -405,6 +424,7 @@ cc_binary(
     ],
     additional_linker_inputs = ["evkmimxrt595_ezhb_HelloRam.ld"],
     linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_HelloRam.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 mimxrt595_binary(
@@ -423,6 +443,7 @@ cc_binary(
     ],
     additional_linker_inputs = ["evkmimxrt595_ezhb_Debug.ld"],
     linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_Debug.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 mimxrt595_binary(
@@ -442,6 +463,7 @@ cc_binary(
         ":fastboot_bootloader_extra_platform_libs",
         ":master_fastboot_bootloader_sources",
     ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 mimxrt595_fastboot_binary(
@@ -476,6 +498,7 @@ cc_binary(
     ],
     additional_linker_inputs = ["evkmimxrt595_ezhb_FastbootApp.ld"],
     linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_FastbootApp.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 mimxrt595_binary(

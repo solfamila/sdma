@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
-load("//tools/bazel:rt595_defs.bzl", "RT595_COMMON_DEFINES", "RT595_LINKOPTS", "RT595_SLAVE_COPTS")
+load("//tools/bazel:rt595_defs.bzl", "RT595_COMMON_DEFINES", "RT595_LINKOPTS", "RT595_SLAVE_COPTS", "RT595_TARGET_COMPATIBLE_WITH")
 load("//tools/bazel:transition.bzl", "mimxrt595_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -18,6 +18,7 @@ cc_library(
     copts = RT595_SLAVE_COPTS,
     defines = RT595_COMMON_DEFINES + ["APP_ENABLE_SEMIHOST=0"],
     deps = ["//src/master:rt595_sdk_core"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
     alwayslink = 1,
 )
 
@@ -26,6 +27,7 @@ cc_binary(
     deps = [":slave_variant"],
     additional_linker_inputs = ["//src/master:evkmimxrt595_ezhb_HelloRam.ld"],
     linkopts = RT595_LINKOPTS + ["-T$(location //src/master:evkmimxrt595_ezhb_HelloRam.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 mimxrt595_binary(
@@ -38,6 +40,7 @@ cc_binary(
     deps = [":slave_variant"],
     additional_linker_inputs = ["//src/master:evkmimxrt595_ezhb_Debug.ld"],
     linkopts = RT595_LINKOPTS + ["-T$(location //src/master:evkmimxrt595_ezhb_Debug.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
 mimxrt595_binary(

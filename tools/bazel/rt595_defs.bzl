@@ -64,3 +64,9 @@ RT595_LINKOPTS = [
     "-Wl,--sort-section=alignment",
     "-Wl,--cref",
 ]
+
+# Skip raw RT595 implementation targets in host builds; final .elf/.fastboot
+# wrappers transition them onto the embedded armv8-m platform.
+RT595_TARGET_COMPATIBLE_WITH = [
+    "@platforms//cpu:armv8-m",
+]
