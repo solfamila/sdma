@@ -157,6 +157,24 @@ cc_library(
 )
 
 cc_library(
+    name = "pigweed_log_backend_no_semihost",
+    srcs = [
+        "source/pigweed_log_backend.c",
+        "source/syscalls.c",
+    ],
+    copts = RT595_COMMON_COPTS,
+    defines = RT595_COMMON_DEFINES + RT595_PIGWEED_DEFINES + ["APP_ENABLE_SEMIHOST=0"],
+    includes = RT595_MASTER_INCLUDES,
+    deps = [
+        ":pw_log_backend_headers",
+        "@pigweed//pw_log:facade",
+        "@pigweed//pw_preprocessor",
+    ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
+    alwayslink = 1,
+)
+
+cc_library(
     name = "fastboot_thread_config_overrides",
     defines = [
         "PW_THREAD_FREERTOS_CONFIG_DEFAULT_STACK_SIZE_WORDS=2048",
@@ -413,6 +431,21 @@ cc_library(
     target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
+cc_library(
+    name = "master_pigweed_trace32_variant",
+    srcs = ["variants/ezh_test_master_pigweed.c"],
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES + RT595_PIGWEED_DEFINES,
+    includes = RT595_MASTER_INCLUDES,
+    deps = [
+        ":pigweed_log_backend_no_semihost",
+        ":pw_log_backend_headers",
+        ":rt595_master_runtime",
+        "@pigweed//pw_log:facade",
+    ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
+)
+
 cc_binary(
     name = "master_pigweed_ram_bin",
     deps = [
@@ -430,6 +463,25 @@ cc_binary(
 mimxrt595_binary(
     name = "master_pigweed_ram.elf",
     binary = ":master_pigweed_ram_bin",
+)
+
+cc_binary(
+    name = "master_pigweed_trace32_ram_bin",
+    deps = [
+        ":master_pigweed_trace32_variant",
+        ":pigweed_log_backend_no_semihost",
+        ":rt595_board_support",
+        ":rt595_master_runtime",
+        ":rt595_sdk_core",
+    ],
+    additional_linker_inputs = ["evkmimxrt595_ezhb_HelloRam.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_HelloRam.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
+)
+
+mimxrt595_binary(
+    name = "master_pigweed_trace32_ram.elf",
+    binary = ":master_pigweed_trace32_ram_bin",
 )
 
 cc_binary(

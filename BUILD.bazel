@@ -20,6 +20,11 @@ alias(
 )
 
 alias(
+    name = "master_pigweed_trace32_ram.elf",
+    actual = "//src/master:master_pigweed_trace32_ram.elf",
+)
+
+alias(
     name = "master_pigweed_flash.elf",
     actual = "//src/master:master_pigweed_flash.elf",
 )
@@ -128,5 +133,21 @@ sh_binary(
         "$(location //src/slave:slave_flash.elf)",
         "PRASAQKQ",
         "GRA1CQLQ",
+    ],
+)
+
+sh_binary(
+    name = "verify_master_slave_transfer_trace32",
+    srcs = ["//tools/bazel:verify_i3c_transfer.sh"],
+    data = [
+        "//src/master:master_pigweed_trace32_ram.elf",
+        "//src/slave:slave_flash.elf",
+    ],
+    args = [
+        "$(location //src/master:master_pigweed_trace32_ram.elf)",
+        "$(location //src/slave:slave_flash.elf)",
+        "PRASAQKQ",
+        "GRA1CQLQ",
+        "trace32",
     ],
 )

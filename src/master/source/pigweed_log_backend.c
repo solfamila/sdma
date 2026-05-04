@@ -2,6 +2,10 @@
  * Pigweed log backend for RT595 semihosting.
  */
 
+#ifndef APP_ENABLE_SEMIHOST
+#define APP_ENABLE_SEMIHOST 1
+#endif
+
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -9,6 +13,7 @@
 
 static void semihost_write0(const char *message)
 {
+#if APP_ENABLE_SEMIHOST
     register unsigned int operation asm("r0") = 0x04U;
     register const char *parameter asm("r1") = message;
 
@@ -17,6 +22,9 @@ static void semihost_write0(const char *message)
         : "+r"(operation)
         : "r"(parameter)
         : "memory");
+#else
+    (void)message;
+#endif
 }
 
 static const char *pigweed_log_level_name(int level)
@@ -45,6 +53,14 @@ void pigweed_log_backend_Log(int level,
                              const char *format,
                              ...)
 {
+#if !APP_ENABLE_SEMIHOST
+    (void)level;
+    (void)module_name;
+    (void)file_name;
+    (void)line_number;
+    (void)format;
+    return;
+#else
     char buffer[256];
     int prefix_length;
     va_list args;
@@ -92,4 +108,5 @@ void pigweed_log_backend_Log(int level,
     }
 
     semihost_write0(buffer);
+#endif
 }
