@@ -17,16 +17,51 @@
 #include "fsl_smartdma.h"
 #include "fsl_smartdma_fw.h"
 #include "fsl_power.h"
+#include "fsl_clock.h"
 #include "fsl_inputmux.h"
 #include "fsl_i3c.h"
 
 #define PW_LOG_MODULE_NAME "rt595-master"
 #include "pw_log/log.h"
 
+#ifndef APP_LINKSERVER_TIMING_MEASURE
+#define APP_LINKSERVER_TIMING_MEASURE 0
+#endif
+
+#define APP_MEASURE_NO_MISMATCH_INDEX UINT32_MAX
+#define MASTER_MEASURE_RETAINED_MAGIC 0x4D545453U
+#define MASTER_MEASURE_RETAINED_VERSION 1U
+
+typedef struct master_measure_retained
+{
+    uint32_t magic;
+    uint32_t version;
+    uint32_t cycles;
+    uint32_t usec;
+    uint32_t status;
+    uint32_t mismatchIndex;
+    uint32_t sdmaIrqSeen;
+    uint32_t tx0;
+    uint32_t tx1;
+    uint32_t tx2;
+    uint32_t tx3;
+    uint32_t rx0;
+    uint32_t rx1;
+    uint32_t rx2;
+    uint32_t rx3;
+    uint32_t tx254;
+    uint32_t rx254;
+} master_measure_retained_t;
+
 void keep_smartdma_api_alive(void);
 
 static void log_info_line(const char *message)
 {
+#if APP_LINKSERVER_TIMING_MEASURE
+    (void)message;
+    return;
+#endif
+
     size_t length = strlen(message);
     while ((length > 0U) && ((message[length - 1U] == '\n') || (message[length - 1U] == '\r')))
     {
@@ -52,16 +87,35 @@ static void log_info_line(const char *message)
 
 static void log_status_info(const char *label, uint32_t value)
 {
+#if APP_LINKSERVER_TIMING_MEASURE
+    (void)label;
+    (void)value;
+    return;
+#endif
+
     PW_LOG_INFO("%s0x%08" PRIX32, label, value);
 }
 
 static void log_status_error(const char *label, uint32_t value)
 {
+#if APP_LINKSERVER_TIMING_MEASURE
+    (void)label;
+    (void)value;
+    return;
+#endif
+
     PW_LOG_ERROR("%s0x%08" PRIX32, label, value);
 }
 
 static void log_buffer_info(const char *label, const uint8_t *buffer, uint32_t length)
 {
+#if APP_LINKSERVER_TIMING_MEASURE
+    (void)label;
+    (void)buffer;
+    (void)length;
+    return;
+#endif
+
     char line[8U * 5U + 1U];
 
     log_info_line(label);
@@ -105,6 +159,19 @@ static void log_irq_metrics(const char *phase,
                             uint32_t cpuIrqSuppressedPreDisablePendingMask,
                             uint32_t cpuIrqSuppressedPreDisableStatusMask)
 {
+#if APP_LINKSERVER_TIMING_MEASURE
+    (void)phase;
+    (void)sdmaIrqSeen;
+    (void)cpuIrqCount;
+    (void)cpuIrqControlCount;
+    (void)cpuIrqDataCount;
+    (void)cpuIrqSuppressedCount;
+    (void)cpuIrqSuppressedPreDisableNvicCount;
+    (void)cpuIrqSuppressedPreDisablePendingMask;
+    (void)cpuIrqSuppressedPreDisableStatusMask;
+    return;
+#endif
+
     char label[96];
 
     (void)snprintf(label, sizeof(label), "master: %s sdma irq seen=", phase);
@@ -130,6 +197,14 @@ static void log_post_return_snapshot(const char *phase,
                                      uint32_t postReturnStatusMask,
                                      uint32_t postReturnNvicPending)
 {
+#if APP_LINKSERVER_TIMING_MEASURE
+    (void)phase;
+    (void)postReturnPendingMask;
+    (void)postReturnStatusMask;
+    (void)postReturnNvicPending;
+    return;
+#endif
+
     char label[80];
 
     (void)snprintf(label, sizeof(label), "master: %s post-return pending mask=", phase);
@@ -142,6 +217,12 @@ static void log_post_return_snapshot(const char *phase,
 
 static void log_smartdma_window_metrics(const char *phase, const i3c_master_smartdma_handle_t *handle)
 {
+#if APP_LINKSERVER_TIMING_MEASURE
+    (void)phase;
+    (void)handle;
+    return;
+#endif
+
     char label[96];
 
     (void)snprintf(label, sizeof(label), "master: %s smartdma active-window irq count=", phase);
@@ -178,6 +259,7 @@ extern uint8_t __smartdma_end__[];
 volatile bool g_sdmaIrqSeen = false;
 __attribute__((aligned(4))) uint8_t ezh_data_buffer[EZH_ROUNDTRIP_DATA_LENGTH];
 __attribute__((aligned(4))) uint8_t ezh_data_buffer_rx[EZH_ROUNDTRIP_DATA_LENGTH];
+__attribute__((section(".usb_ram"), used, aligned(4))) volatile master_measure_retained_t g_measureRetained;
 
 uint8_t g_master_ibiBuff[10];
 i3c_master_smartdma_handle_t g_i3c_m_handle;
@@ -186,6 +268,106 @@ const i3c_master_smartdma_callback_t masterCallback = {
 volatile bool g_masterCompletionFlag = false;
 volatile bool g_ibiWonFlag           = false;
 volatile status_t g_completionStatus = kStatus_Success;
+
+extern uint32_t SystemCoreClock;
+
+static void master_enable_retained_measurement_ram(void)
+{
+#if APP_LINKSERVER_TIMING_MEASURE
+    POWER_DisablePD(kPDRUNCFG_APD_USBHS_SRAM);
+    POWER_DisablePD(kPDRUNCFG_PPD_USBHS_SRAM);
+    POWER_ApplyPD();
+
+    RESET_PeripheralReset(kUSBHS_SRAM_RST_SHIFT_RSTn);
+    CLOCK_EnableClock(kCLOCK_UsbhsSram);
+#endif
+}
+
+static void master_reset_retained_measurement(void)
+{
+#if APP_LINKSERVER_TIMING_MEASURE
+    volatile uint32_t *words = (volatile uint32_t *)&g_measureRetained;
+
+    for (uint32_t index = 0U; index < (sizeof(g_measureRetained) / sizeof(uint32_t)); index++)
+    {
+        words[index] = 0U;
+    }
+
+    g_measureRetained.magic = MASTER_MEASURE_RETAINED_MAGIC;
+    g_measureRetained.version = MASTER_MEASURE_RETAINED_VERSION;
+    g_measureRetained.mismatchIndex = APP_MEASURE_NO_MISMATCH_INDEX;
+#endif
+}
+
+static void init_cycle_counter(void)
+{
+#if APP_LINKSERVER_TIMING_MEASURE
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0U;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+#endif
+}
+
+static uint32_t read_cycle_counter(void)
+{
+#if APP_LINKSERVER_TIMING_MEASURE
+    return DWT->CYCCNT;
+#else
+    return 0U;
+#endif
+}
+
+static void log_timing_summary(status_t result, uint32_t cycles, uint32_t mismatchIndex)
+{
+#if APP_LINKSERVER_TIMING_MEASURE
+    uint32_t usec = 0U;
+
+    if (SystemCoreClock != 0U)
+    {
+        usec = (uint32_t)(((uint64_t)cycles * 1000000ULL) / SystemCoreClock);
+    }
+
+    g_measureRetained.cycles = cycles;
+    g_measureRetained.usec = usec;
+    g_measureRetained.status = (uint32_t)result;
+    g_measureRetained.mismatchIndex = mismatchIndex;
+    g_measureRetained.sdmaIrqSeen = g_sdmaIrqSeen ? 1U : 0U;
+    g_measureRetained.tx0 = ezh_data_buffer[0];
+    g_measureRetained.tx1 = ezh_data_buffer[1];
+    g_measureRetained.tx2 = ezh_data_buffer[2];
+    g_measureRetained.tx3 = ezh_data_buffer[3];
+    g_measureRetained.rx0 = ezh_data_buffer_rx[0];
+    g_measureRetained.rx1 = ezh_data_buffer_rx[1];
+    g_measureRetained.rx2 = ezh_data_buffer_rx[2];
+    g_measureRetained.rx3 = ezh_data_buffer_rx[3];
+    g_measureRetained.tx254 = ezh_data_buffer[254];
+    g_measureRetained.rx254 = ezh_data_buffer_rx[254];
+
+    PW_LOG_INFO("ttsTiming= cycles=%" PRIu32 " usec=%" PRIu32 " coreClockHz=%" PRIu32
+                " status=%" PRIu32 " mismatchIndex=%" PRIu32 " sdmaIrqSeen=%u",
+                cycles,
+                usec,
+                SystemCoreClock,
+                (uint32_t)result,
+                mismatchIndex,
+                g_measureRetained.sdmaIrqSeen);
+    PW_LOG_INFO("ttsBuffers= tx0=%u tx1=%u tx2=%u tx3=%u rx0=%u rx1=%u rx2=%u rx3=%u tx254=%u rx254=%u",
+                ezh_data_buffer[0],
+                ezh_data_buffer[1],
+                ezh_data_buffer[2],
+                ezh_data_buffer[3],
+                ezh_data_buffer_rx[0],
+                ezh_data_buffer_rx[1],
+                ezh_data_buffer_rx[2],
+                ezh_data_buffer_rx[3],
+                ezh_data_buffer[254],
+                ezh_data_buffer_rx[254]);
+#else
+    (void)result;
+    (void)cycles;
+    (void)mismatchIndex;
+#endif
+}
 
 #define I3C_TIME_OUT_INDEX 100000000U
 
@@ -304,15 +486,21 @@ int main(void)
     uint32_t readPostReturnPendingMask = 0U;
     uint32_t readPostReturnStatusMask = 0U;
     uint32_t readPostReturnNvicPending = 0U;
+    uint32_t transferCycles = 0U;
+    uint32_t mismatchIndex = APP_MEASURE_NO_MISMATCH_INDEX;
     uint8_t slaveAddr = 0U;
     status_t result           = kStatus_Success;
 
     BOARD_InitHardware();
+    master_enable_retained_measurement_ram();
+    master_reset_retained_measurement();
     log_info_line("master: hardware init done\n");
 
     log_info_line("master: start\n");
+#if !APP_LINKSERVER_TIMING_MEASURE
     PW_LOG_INFO("MCUX SDK version: %s", MCUXSDK_VERSION_FULL_STR);
     PW_LOG_INFO("EZHB Builder");
+#endif
     log_info_line("master: powering smartdma sram\n");
 
     POWER_DisablePD(kPDRUNCFG_APD_SMARTDMA_SRAM);
@@ -353,7 +541,9 @@ int main(void)
     memset(&masterXfer, 0, sizeof(masterXfer));
     log_info_line("master: handle created\n");
 
+#if !APP_LINKSERVER_TIMING_MEASURE
     PW_LOG_INFO("master: starting daa broadcast");
+#endif
 
     memset(&masterXfer, 0, sizeof(masterXfer));
 
@@ -409,6 +599,7 @@ int main(void)
     }
 
     log_info_line("master: preparing smartdma transfer\n");
+    init_cycle_counter();
 
     memset(&masterXfer, 0, sizeof(masterXfer));
     masterXfer.slaveAddress = slaveAddr;
@@ -448,6 +639,8 @@ int main(void)
         log_post_return_snapshot(
             "write", writePostReturnPendingMask, writePostReturnStatusMask, writePostReturnNvicPending);
         log_status_error("master: write transfer failed ", (uint32_t)result);
+        transferCycles = read_cycle_counter();
+        log_timing_summary(result, transferCycles, mismatchIndex);
         return -1;
     }
 
@@ -508,6 +701,8 @@ int main(void)
         log_post_return_snapshot(
             "read", readPostReturnPendingMask, readPostReturnStatusMask, readPostReturnNvicPending);
         log_status_error("master: read transfer failed ", (uint32_t)result);
+        transferCycles = read_cycle_counter();
+        log_timing_summary(result, transferCycles, mismatchIndex);
         return -1;
     }
 
@@ -517,12 +712,17 @@ int main(void)
     {
         if (ezh_data_buffer[index] != ezh_data_buffer_rx[index])
         {
+#if !APP_LINKSERVER_TIMING_MEASURE
             PW_LOG_ERROR("master: roundtrip mismatch index=%" PRIu32 " expected=0x%02X actual=0x%02X",
                          index,
                          ezh_data_buffer[index],
                          ezh_data_buffer_rx[index]);
+#endif
             log_buffer_info("master: expected data\n", ezh_data_buffer, sizeof(ezh_data_buffer));
             log_buffer_info("master: rx data\n", ezh_data_buffer_rx, sizeof(ezh_data_buffer_rx));
+            mismatchIndex = index;
+            transferCycles = read_cycle_counter();
+            log_timing_summary(result, transferCycles, mismatchIndex);
             while (1)
             {
                 __WFI();
@@ -531,6 +731,8 @@ int main(void)
     }
 
     log_info_line("master: roundtrip compare success\n");
+    transferCycles = read_cycle_counter();
+    log_timing_summary(result, transferCycles, mismatchIndex);
     log_irq_metrics("read",
                     readSdmaIrqSeen,
                     readCpuIrqCount,

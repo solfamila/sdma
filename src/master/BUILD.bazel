@@ -446,6 +446,20 @@ cc_library(
     target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
 )
 
+cc_library(
+    name = "master_pigweed_measure_variant",
+    srcs = ["variants/ezh_test_master_pigweed.c"],
+    copts = RT595_MASTER_COPTS,
+    defines = RT595_COMMON_DEFINES + RT595_PIGWEED_DEFINES + ["APP_LINKSERVER_TIMING_MEASURE=1"],
+    includes = RT595_MASTER_INCLUDES,
+    deps = [
+        ":pw_log_backend_headers",
+        ":rt595_master_runtime",
+        "@pigweed//pw_log:facade",
+    ],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
+)
+
 cc_binary(
     name = "master_pigweed_ram_bin",
     deps = [
@@ -482,6 +496,44 @@ cc_binary(
 mimxrt595_binary(
     name = "master_pigweed_trace32_ram.elf",
     binary = ":master_pigweed_trace32_ram_bin",
+)
+
+cc_binary(
+    name = "master_pigweed_measure_ram_bin",
+    deps = [
+        ":master_pigweed_measure_variant",
+        ":pigweed_log_backend",
+        ":rt595_board_support",
+        ":rt595_master_runtime",
+        ":rt595_sdk_core",
+    ],
+    additional_linker_inputs = ["evkmimxrt595_ezhb_HelloRam.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_HelloRam.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
+)
+
+mimxrt595_binary(
+    name = "master_pigweed_measure_ram.elf",
+    binary = ":master_pigweed_measure_ram_bin",
+)
+
+cc_binary(
+    name = "master_pigweed_measure_quiet_ram_bin",
+    deps = [
+        ":master_pigweed_measure_variant",
+        ":pigweed_log_backend_no_semihost",
+        ":rt595_board_support",
+        ":rt595_master_runtime",
+        ":rt595_sdk_core",
+    ],
+    additional_linker_inputs = ["evkmimxrt595_ezhb_HelloRam.ld"],
+    linkopts = RT595_LINKOPTS + ["-T$(location :evkmimxrt595_ezhb_HelloRam.ld)"],
+    target_compatible_with = RT595_TARGET_COMPATIBLE_WITH,
+)
+
+mimxrt595_binary(
+    name = "master_pigweed_measure_quiet_ram.elf",
+    binary = ":master_pigweed_measure_quiet_ram_bin",
 )
 
 cc_binary(

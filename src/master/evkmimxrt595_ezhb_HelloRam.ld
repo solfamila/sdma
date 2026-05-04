@@ -3,10 +3,13 @@ ENTRY(ResetISR)
 MEMORY
 {
   SRAM (rwx) : ORIGIN = 0x20280000, LENGTH = 0x00280000
+  USB_RAM (rwx) : ORIGIN = 0x40140000, LENGTH = 0x00004000
 }
 
 __base_SRAM = ORIGIN(SRAM);
 __top_SRAM = ORIGIN(SRAM) + LENGTH(SRAM);
+__base_USB_RAM = ORIGIN(USB_RAM);
+__top_USB_RAM = ORIGIN(USB_RAM) + LENGTH(USB_RAM);
 
 __stack_size__ = 0x4000;
 __heap_size__ = 0x4000;
@@ -115,6 +118,13 @@ SECTIONS
     . = ALIGN(4);
     __smartdma_end__ = .;
   } > SRAM
+
+  .usb_ram (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.usb_ram*)
+    . = ALIGN(4);
+  } > USB_RAM
 
   .bss (NOLOAD) :
   {
